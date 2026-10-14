@@ -16,11 +16,12 @@ Preferences prefs;
 
 // --- Режимы работы устройства ---
 enum AppMode {
-  MODE_TEXT = 0,
-  MODE_EFFECT = 1,
-  MODE_CUSTOM_ANIM = 2,
-  MODE_DRAW_LIVE = 3,
-  MODE_RAW_STREAM = 4
+  MODE_IDLE = 0,
+  MODE_TEXT = 1,
+  MODE_EFFECT = 2,
+  MODE_CUSTOM_ANIM = 3,
+  MODE_DRAW_LIVE = 4,
+  MODE_RAW_STREAM = 5
 };
 
 AppMode appMode = MODE_TEXT;
@@ -723,6 +724,9 @@ void renderVuBars(uint8_t style, const String& heights) {
   FastLED.show();
 }
 
+uint8_t lastRenderedEffect = 255;
+uint32_t effectTicks = 0;
+
 void switchAppMode(AppMode newMode) {
   if (appMode != newMode) {
     appMode = newMode;
@@ -732,6 +736,8 @@ void switchAppMode(AppMode newMode) {
     lastTextStep = 0;
     lastEffectStep = 0;
     lastCustomFrameTime = 0;
+    lastRenderedEffect = 255;
+    effectTicks = 0;
   }
 }
 
@@ -836,6 +842,20 @@ void processBleCommand(String cmd) {
       }
     }
     sendBleResponse("OK_LP");
+  } else if (cmd.startsWith("SPEED:")) {
+    uint16_t spd = constrain(cmd.substring(6).toInt(), 10, 300);
+    scrollDelay = spd;
+    effectSpeed = spd;
+    customFps = constrain(1000 / spd, 1, 30);
+    prefs.putUShort("speed", scrollDelay);
+    sendBleResponse("OK_SPEED;" + String(spd));
+  } else if (cmd == "STOP") {
+    switchAppMode(MODE_IDLE);
+    sendBleResponse("OK_STOP");
+  } else if (cmd == "SAVE_SETTINGS") {
+    prefs.putUChar("bright", brightness);
+    prefs.putUShort("speed", scrollDelay);
+    sendBleResponse("OK_SAVE_SETTINGS");
   } else if (cmd.startsWith("VU:")) {
     // VU:<style>,<10_digits> e.g. VU:0,0123454321
     int comma = cmd.indexOf(',', 3);
@@ -847,7 +867,7 @@ void processBleCommand(String cmd) {
     } else {
       hStr = cmd.substring(3);
     }
-    appMode = MODE_RAW_STREAM;
+    switchAppMode(MODE_RAW_STREAM);
     renderVuBars(style, hStr);
   } else if (cmd.startsWith("RAW:")) {
     String hex = cmd.substring(4);
@@ -858,11 +878,13 @@ void processBleCommand(String cmd) {
       leds[XY(x, y)] = parseHexColor(hex.substring(i * 6, i * 6 + 6));
     }
     FastLED.show();
-    appMode = MODE_RAW_STREAM;
+    switchAppMode(MODE_RAW_STREAM);
   } else if (cmd == "STATUS?") {
     String st = "STATUS:{\"text\":\"" + currentText + "\",";
     st += "\"bright\":" + String(brightness) + ",";
     st += "\"speed\":" + String(scrollDelay) + ",";
+    st += "\"appMode\":" + String((int)appMode) + ",";
+    st += "\"eff\":" + String(currentEffect) + ",";
     st += "\"mode\":" + String(textColMode) + ",";
     st += "\"style\":" + String(textStyle) + ",";
     st += "\"bg\":" + String(textBgMode) + ",";
@@ -1276,8 +1298,12 @@ void loop() {
     sendBleResponse(bleAuthenticated ? "OK_BEAT" : "PING");
   }
 
+  // 0. РЕЖИМ ОЖИДАНИЯ / ВЫКЛЮЧЕНО (MODE_IDLE)
+  if (appMode == MODE_IDLE) {
+    // Ничего не рендерим
+  }
   // 1. РЕЖИМ БЕГУЩЕЙ СТРОКИ / ТЕКСТА V2
-  if (appMode == MODE_TEXT) {
+  else if (appMode == MODE_TEXT) {
     if (now - lastTextStep >= scrollDelay) {
       lastTextStep = now;
       FastLED.clear();
@@ -1378,8 +1404,6 @@ void loop() {
 
   // 2. РЕЖИМ ВСТРОЕННЫХ ЭФФЕКТОВ
   else if (appMode == MODE_EFFECT) {
-    static uint8_t lastRenderedEffect = 255;
-    static uint32_t effectTicks = 0;
     if (currentEffect != lastRenderedEffect) {
       lastRenderedEffect = currentEffect;
       effectTicks = 0;

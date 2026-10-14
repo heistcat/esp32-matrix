@@ -134,6 +134,53 @@
     </div>
   </div>
 
+  <!-- ПАНЕЛЬ ГЛОБАЛЬНОГО УПРАВЛЕНИЯ МАТРИЦЕЙ (STATE MACHINE + ЯРКОСТЬ + СКОРОСТЬ) -->
+  <div class="card" style="border-color: rgba(0, 240, 255, 0.4); background: linear-gradient(180deg, #101828, #0c121e);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 13px; font-weight: 700; color: var(--text);">Режим:</span>
+        <span id="activeStateBadge" style="font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 20px; background: rgba(0, 240, 255, 0.15); color: var(--accent); border: 1px solid rgba(0, 240, 255, 0.3);">
+          ⚪ Ожидание (Готово)
+        </span>
+      </div>
+      <div style="display: flex; gap: 6px;">
+        <button class="danger" style="padding: 6px 12px; font-size: 12px;" onclick="stopEverything()" title="Остановить все трансляции и очистить матрицу">⏹ СТОП</button>
+        <button class="sec" id="globalPauseBtn" style="padding: 6px 12px; font-size: 12px;" onclick="toggleGlobalPause()">⏸ Пауза</button>
+        <button class="sec" style="padding: 6px 12px; font-size: 12px;" onclick="saveGlobalSettingsBle()" title="Сохранить настройки во Flash ESP32">💾 Сохранить</button>
+      </div>
+    </div>
+
+    <!-- Глобальная Яркость -->
+    <div class="slider-group" style="margin-top: 8px;">
+      <div class="slider-head">
+        <span>🔆 Яркость матрицы</span>
+        <span class="slider-val" id="globalBrightVal">40</span>
+      </div>
+      <input type="range" id="globalBright" min="5" max="255" value="40" oninput="updateGlobalBright(this.value)">
+      <div class="presets" style="margin-top: 2px;">
+        <span class="preset-btn" onclick="setBrightPreset(15)">🌙 Ночь (15)</span>
+        <span class="preset-btn" onclick="setBrightPreset(45)">💡 Норма (45)</span>
+        <span class="preset-btn" onclick="setBrightPreset(100)">☀️ День (100)</span>
+        <span class="preset-btn" onclick="setBrightPreset(220)">🔥 Макс (220)</span>
+      </div>
+    </div>
+
+    <!-- Глобальная Скорость -->
+    <div class="slider-group" style="margin-top: 8px;">
+      <div class="slider-head">
+        <span>⚡ Скорость матрицы (строка, эффекты, информер)</span>
+        <span class="slider-val" id="globalSpeedVal">65 мс</span>
+      </div>
+      <input type="range" id="globalSpeed" min="15" max="200" value="65" oninput="updateGlobalSpeed(this.value)">
+      <div class="presets" style="margin-top: 2px;">
+        <span class="preset-btn" onclick="setSpeedPreset(25)">🚀 Турбо (25мс)</span>
+        <span class="preset-btn" onclick="setSpeedPreset(45)">⚡ Быстро (45мс)</span>
+        <span class="preset-btn" onclick="setSpeedPreset(70)">🚶 Норма (70мс)</span>
+        <span class="preset-btn" onclick="setSpeedPreset(120)">🐢 Плавно (120мс)</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Navigation Tabs -->
   <div class="nav-tabs">
     <button class="nav-btn active" id="btn-tabSmart" onclick="switchTab('tabSmart')">🕒 Виджеты</button>
@@ -151,13 +198,15 @@
         <span>🔀 Смарт-Информер (Комбинация данных)</span>
         <span id="comboStatus" style="font-size:11px; color:var(--accent);">Готово</span>
       </div>
-      <p style="font-size:12px; color:var(--text-dim);">Объединяет время, погоду и курсы валют в единый информационный режим.</p>
+      <p style="font-size:12px; color:var(--text-dim);">Объединяет время, дату, погоду, курсы валют и праздники в единый информер.</p>
       
       <div class="card-title" style="margin-top:2px;">Включить в информер</div>
-      <div class="grid-3">
+      <div class="grid-5">
         <div class="btn-select active" id="cbOptTime" onclick="toggleComboOpt('time')">🕒 Время</div>
+        <div class="btn-select active" id="cbOptDate" onclick="toggleComboOpt('date')">📅 Дата</div>
         <div class="btn-select active" id="cbOptWeather" onclick="toggleComboOpt('weather')">⛅ Погода</div>
         <div class="btn-select active" id="cbOptRates" onclick="toggleComboOpt('rates')">💱 Валюты</div>
+        <div class="btn-select" id="cbOptNewYear" onclick="toggleComboOpt('newyear')">🎄 До НГ</div>
       </div>
 
       <div class="card-title" style="margin-top:2px;">Формат показа</div>
@@ -209,6 +258,91 @@
       <div class="grid-2" style="margin-top:4px;">
         <button id="clockStreamBtn" onclick="toggleClockStream()">▶ Включить трансляцию часов</button>
         <button class="sec" onclick="sendClockOnce()">Отправить 1 раз</button>
+      </div>
+    </div>
+
+    <!-- СПОРТИВНЫЙ ТАЙМЕР И СЕКУНДОМЕР -->
+    <div class="card">
+      <div class="card-title">
+        <span>⏱️ Таймер и Секундомер</span>
+        <span id="timerPreview" style="color:var(--accent); font-weight:700;">05:00</span>
+      </div>
+      <p style="font-size:12px; color:var(--text-dim);">Удобный настольный таймер для работы (Помодоро), чая, тренировок или секундомер.</p>
+      
+      <div class="grid-2" style="margin-top:2px;">
+        <div class="btn-select active" id="swModeTimer" onclick="switchTimerMode('timer')">⏳ Таймер обратного отсчета</div>
+        <div class="btn-select" id="swModeStopwatch" onclick="switchTimerMode('stopwatch')">⏱️ Секундомер</div>
+      </div>
+
+      <div id="timerControlsWrap">
+        <div class="card-title" style="margin-top:4px;">Быстрые пресеты таймера</div>
+        <div class="presets">
+          <span class="preset-btn" onclick="setTimerMinutes(25)">🍅 Помодоро (25 мин)</span>
+          <span class="preset-btn" onclick="setTimerMinutes(3)">🫖 Чай (3 мин)</span>
+          <span class="preset-btn" onclick="setTimerMinutes(1)">⚡ 1 минута</span>
+          <span class="preset-btn" onclick="setTimerMinutes(5)">⏱️ 5 минут</span>
+          <span class="preset-btn" onclick="setTimerMinutes(10)">⏱️ 10 минут</span>
+          <span class="preset-btn" onclick="setTimerMinutes(15)">⏱️ 15 минут</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+          <span style="font-size:12px; color:var(--text-dim);">Свое время:</span>
+          <input type="number" id="timerCustomMins" min="0" max="99" value="5" style="width:60px; padding:6px 8px; border-radius:8px; background:#141d30; border:1px solid var(--border); color:#fff; font-size:13px;" placeholder="Мин">
+          <span style="font-size:12px; color:var(--text-dim);">мин</span>
+          <input type="number" id="timerCustomSecs" min="0" max="59" value="0" style="width:60px; padding:6px 8px; border-radius:8px; background:#141d30; border:1px solid var(--border); color:#fff; font-size:13px;" placeholder="Сек">
+          <span style="font-size:12px; color:var(--text-dim);">сек</span>
+          <button class="sec" style="padding:6px 12px; font-size:12px;" onclick="applyCustomTimer()">Задать</button>
+        </div>
+      </div>
+
+      <div class="grid-3" style="margin-top:8px;">
+        <button id="timerStartBtn" onclick="toggleTimerOrStopwatch()">▶ Старт</button>
+        <button class="sec" onclick="pauseTimerOrStopwatch()">⏸ Пауза</button>
+        <button class="danger" onclick="resetTimerOrStopwatch()">🔄 Сброс</button>
+      </div>
+    </div>
+
+    <!-- КАЛЕНДАРЬ, ДАТА И ОБРАТНЫЙ ОТСЧЕТ -->
+    <div class="card">
+      <div class="card-title">
+        <span>📅 Календарь и Дни до События</span>
+        <span id="datePreview" style="color:var(--accent); font-weight:700;">-</span>
+      </div>
+      <p style="font-size:12px; color:var(--text-dim);">Транслирует сегодняшнюю дату или дни до Нового Года и важных событий.</p>
+      
+      <div class="grid-3">
+        <div class="btn-select active" id="dateOptToday" onclick="setDatePreset('today')">📅 Сегодняшняя дата</div>
+        <div class="btn-select" id="dateOptNY" onclick="setDatePreset('newyear')">🎄 До Нового Года</div>
+        <div class="btn-select" id="dateOptCustom" onclick="setDatePreset('custom')">🎯 Свое событие</div>
+      </div>
+
+      <div id="customEventWrap" style="display:none; flex-direction:column; gap:6px; margin-top:6px;">
+        <div class="input-row">
+          <input type="text" id="customEventName" placeholder="Название (например: ДЕНЬ РОЖДЕНИЯ)" value="ДЕНЬ РОЖДЕНИЯ">
+          <input type="date" id="customEventDate" style="background:#141d30; border:1px solid var(--border); color:#fff; padding:8px; border-radius:10px;">
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:6px;">
+        <button id="dateStreamBtn" onclick="toggleDateStream()">▶ Транслировать дату</button>
+        <button class="sec" onclick="sendDateOnce()">Отправить 1 раз</button>
+      </div>
+    </div>
+
+    <!-- БЫСТРЫЕ СТАТУСЫ ДЛЯ РАБОЧЕГО СТОЛА -->
+    <div class="card">
+      <div class="card-title">
+        <span>💬 Статусы для рабочего стола</span>
+        <span style="font-size:11px; color:var(--accent);">В 1 клик</span>
+      </div>
+      <p style="font-size:12px; color:var(--text-dim);">Установите световую табличку на столе для коллег или домашних.</p>
+      
+      <div class="grid-3">
+        <div class="btn-select" style="border-color:#ff0044; color:#ff3366;" onclick="applyDeskStatus('busy')">⛔ НЕ БЕСПОКОИТЬ</div>
+        <div class="btn-select" style="border-color:#ffaa00; color:#ffbb33;" onclick="applyDeskStatus('coffee')">☕ НА КОФЕ</div>
+        <div class="btn-select" style="border-color:#aa00ff; color:#cc44ff;" onclick="applyDeskStatus('call')">🎧 НА СОЗВОНЕ</div>
+        <div class="btn-select" style="border-color:#00ff88; color:#00ff88;" onclick="applyDeskStatus('work')">💻 В РАБОТЕ</div>
+        <div class="btn-select" style="border-color:#00f0ff; color:#00f0ff;" onclick="applyDeskStatus('afk')">🚪 ОТОШЕЛ (AFK)</div>
+        <div class="btn-select" style="border-color:#ff3300; color:#ff5500;" onclick="applyDeskStatus('fire')">🔥 ДЕДЛАЙН</div>
       </div>
     </div>
 
@@ -862,9 +996,26 @@
       document.getElementById('globalBright').value = data.bright;
       document.getElementById('globalBrightVal').innerText = data.bright;
     }
-    if (data.speed) {
-      document.getElementById('textSpeed').value = data.speed;
-      document.getElementById('textSpeedVal').innerText = data.speed + ' мс';
+    if (data.speed !== undefined) {
+      const gs = document.getElementById('globalSpeed');
+      if (gs) gs.value = data.speed;
+      const gsv = document.getElementById('globalSpeedVal');
+      if (gsv) gsv.innerText = data.speed + ' мс';
+      const ts = document.getElementById('textSpeed');
+      if (ts) ts.value = data.speed;
+      const tsv = document.getElementById('textSpeedVal');
+      if (tsv) tsv.innerText = data.speed + ' мс';
+      textState.speed = data.speed;
+    }
+    if (data.appMode !== undefined) {
+      const modeNames = ['IDLE', 'TEXT', 'EFFECT', 'ANIM', 'DRAW', 'MIC_VU'];
+      const st = modeNames[data.appMode] || 'IDLE';
+      appStateMachine.currentState = st;
+      if (st === 'EFFECT' && data.eff !== undefined) {
+        const effNames = ["Нян-Кэт", "Матрица", "Огонь", "Эквалайзер", "Пакман", "Сердце", "Плазма"];
+        appStateMachine.currentPayload = effNames[data.eff] || ('№' + data.eff);
+      }
+      appStateMachine.updateBadge();
     }
     if (data.mode !== undefined) setTextMode(data.mode);
     if (data.style !== undefined) setTextStyle(data.style);
@@ -886,6 +1037,109 @@
       }
     }
     showToast("Статус матрицы обновлен");
+  }
+
+  // ==============================================================
+  // --- ЦЕНТРАЛИЗОВАННЫЙ STATE MACHINE И ГЛОБАЛЬНЫЕ НАСТРОЙКИ ---
+  // ==============================================================
+  const appStateMachine = {
+    currentState: 'IDLE',
+    currentPayload: '',
+
+    setState(st, payload = '') {
+      stopAllStreams();
+      this.currentState = st;
+      this.currentPayload = payload;
+      this.updateBadge();
+    },
+
+    updateBadge() {
+      const badge = document.getElementById('activeStateBadge');
+      if (!badge) return;
+      const names = {
+        'IDLE': '⚪ Ожидание (Готово)',
+        'COMBO': '🔀 Смарт-Информер',
+        'CLOCK': '🕒 Точные часы',
+        'TIMER': '⏳ Таймер: ' + (typeof formatTimeMinSec === 'function' ? formatTimeMinSec(timerRemainingSecs) : '00:00'),
+        'STOPWATCH': '⏱️ Секундомер: ' + (typeof formatTimeMinSec === 'function' ? formatTimeMinSec(stopwatchSecs) : '00:00'),
+        'DATE': '📅 Дата / Событие',
+        'STATUS_DESK': '💬 Статус: ' + this.currentPayload,
+        'RATES': '💱 Курсы валют UZS',
+        'WEATHER': '⛅ Погода',
+        'TEXT': '🔤 Текст: ' + this.currentPayload,
+        'EFFECT': '🎬 Эффект: ' + this.currentPayload,
+        'DRAW': '🎨 Рисование',
+        'ANIM': '🎞️ Анимация',
+        'MIC_VU': '🎵 Цветомузыка'
+      };
+      badge.innerText = names[this.currentState] || ('🟢 ' + this.currentState);
+    }
+  };
+
+  function stopEverything() {
+    stopAllStreams();
+    appStateMachine.setState('IDLE');
+    sendBleRaw("STOP\n");
+    showToast("⏹ Все потоки остановлены, матрица выключена");
+  }
+
+  let globalPaused = false;
+  function toggleGlobalPause() {
+    globalPaused = !globalPaused;
+    sendBleRaw("PAUSE:" + (globalPaused ? 1 : 0) + "\n");
+    const btn = document.getElementById('globalPauseBtn');
+    if (btn) {
+      btn.innerText = globalPaused ? "▶ Возобновить" : "⏸ Пауза";
+      if (globalPaused) btn.classList.add('active'); else btn.classList.remove('active');
+    }
+    showToast(globalPaused ? "⏸ Пауза" : "▶ Возобновлено");
+  }
+
+  let globalBrightTimer = null;
+  function updateGlobalBright(v) {
+    document.getElementById('globalBrightVal').innerText = v;
+    const oldBright = document.getElementById('globalBright');
+    if (oldBright) oldBright.value = v;
+    clearTimeout(globalBrightTimer);
+    globalBrightTimer = setTimeout(() => {
+      sendBleRaw(`BRIGHT:${v}\n`);
+    }, 40);
+  }
+
+  function setBrightPreset(v) {
+    document.getElementById('globalBright').value = v;
+    updateGlobalBright(v);
+  }
+
+  let globalSpeedTimer = null;
+  function updateGlobalSpeed(v) {
+    document.getElementById('globalSpeedVal').innerText = v + ' мс';
+    textState.speed = parseInt(v);
+    const ts = document.getElementById('textSpeed');
+    if (ts) ts.value = v;
+    const tsv = document.getElementById('textSpeedVal');
+    if (tsv) tsv.innerText = v + ' мс';
+    
+    const fps = Math.max(1, Math.min(30, Math.round(1000 / v)));
+    const fpsSl = document.getElementById('fpsSlider');
+    if (fpsSl) fpsSl.value = fps;
+    const fpsV = document.getElementById('fpsVal');
+    if (fpsV) fpsV.innerText = fps + ' FPS';
+
+    clearTimeout(globalSpeedTimer);
+    globalSpeedTimer = setTimeout(() => {
+      sendBleRaw(`SPEED:${v}\n`);
+    }, 40);
+  }
+
+  function setSpeedPreset(v) {
+    document.getElementById('globalSpeed').value = v;
+    updateGlobalSpeed(v);
+  }
+
+  function saveGlobalSettingsBle() {
+    sendBleRaw("SAVE_SETTINGS\n");
+    showToast("💾 Настройки яркости и скорости сохранены во Flash ESP32");
   }
 
   // PIN модалка
@@ -1002,9 +1256,11 @@
       clockStreamTimer = null;
       document.getElementById('clockStreamBtn').innerText = "▶ Включить трансляцию часов";
       document.getElementById('clockStreamBtn').classList.remove('danger');
+      appStateMachine.setState('IDLE');
       showToast("Трансляция часов остановлена");
     } else {
       stopAllStreams();
+      appStateMachine.setState('CLOCK');
       sendClockOnce();
       clockStreamTimer = setInterval(sendClockOnce, 20000); // каждые 20 сек
       document.getElementById('clockStreamBtn').innerText = "⏹ Остановить трансляцию";
@@ -1014,9 +1270,296 @@
   }
 
   // ==========================================
+  // --- СПОРТИВНЫЙ ТАЙМЕР И СЕКУНДОМЕР ---
+  // ==========================================
+  let timerMode = 'timer'; // 'timer' или 'stopwatch'
+  let timerTotalSecs = 300;
+  let timerRemainingSecs = 300;
+  let timerActive = false;
+  let timerTimer = null;
+
+  let stopwatchSecs = 0;
+  let stopwatchActive = false;
+  let stopwatchTimer = null;
+
+  function switchTimerMode(mode) {
+    timerMode = mode;
+    document.getElementById('swModeTimer').classList.toggle('active', mode === 'timer');
+    document.getElementById('swModeStopwatch').classList.toggle('active', mode === 'stopwatch');
+    document.getElementById('timerControlsWrap').style.display = (mode === 'timer' ? 'block' : 'none');
+    updateTimerDisplay();
+  }
+
+  function setTimerMinutes(mins) {
+    pauseTimerOrStopwatch();
+    timerTotalSecs = mins * 60;
+    timerRemainingSecs = timerTotalSecs;
+    updateTimerDisplay();
+    showToast(`Таймер установлен на ${mins} мин`);
+  }
+
+  function applyCustomTimer() {
+    const m = parseInt(document.getElementById('timerCustomMins').value) || 0;
+    const s = parseInt(document.getElementById('timerCustomSecs').value) || 0;
+    if (m === 0 && s === 0) return showToast("Укажите время");
+    pauseTimerOrStopwatch();
+    timerTotalSecs = m * 60 + s;
+    timerRemainingSecs = timerTotalSecs;
+    updateTimerDisplay();
+    showToast(`Таймер: ${m}м ${s}с`);
+  }
+
+  function formatTimeMinSec(secs) {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
+  function updateTimerDisplay() {
+    const preview = document.getElementById('timerPreview');
+    if (!preview) return;
+    if (timerMode === 'timer') {
+      preview.innerText = formatTimeMinSec(timerRemainingSecs);
+    } else {
+      preview.innerText = formatTimeMinSec(stopwatchSecs);
+    }
+  }
+
+  function toggleTimerOrStopwatch() {
+    if (timerMode === 'timer') {
+      if (timerActive) {
+        pauseTimerOrStopwatch();
+      } else {
+        startTimer();
+      }
+    } else {
+      if (stopwatchActive) {
+        pauseTimerOrStopwatch();
+      } else {
+        startStopwatch();
+      }
+    }
+  }
+
+  function startTimer() {
+    if (timerRemainingSecs <= 0) timerRemainingSecs = timerTotalSecs;
+    stopAllStreams();
+    timerActive = true;
+    appStateMachine.setState('TIMER', formatTimeMinSec(timerRemainingSecs));
+    document.getElementById('timerStartBtn').innerText = "⏸ Пауза";
+    document.getElementById('timerStartBtn').classList.add('danger');
+
+    sendTimerFrameToMatrix();
+    timerTimer = setInterval(() => {
+      if (timerRemainingSecs > 0) {
+        timerRemainingSecs--;
+        updateTimerDisplay();
+        appStateMachine.updateBadge();
+        sendTimerFrameToMatrix();
+      } else {
+        pauseTimerOrStopwatch();
+        playTimerDoneSound();
+        sendBleRaw(`TP:1,ff0000,000000,000000,60,3,0,1,3,1\n`);
+        sendBleRaw(`T:ГОТОВО!\n`);
+        showToast("🔔 ВРЕМЯ ВЫШЛО!");
+      }
+    }, 1000);
+  }
+
+  function startStopwatch() {
+    stopAllStreams();
+    stopwatchActive = true;
+    appStateMachine.setState('STOPWATCH', formatTimeMinSec(stopwatchSecs));
+    document.getElementById('timerStartBtn').innerText = "⏸ Пауза";
+    document.getElementById('timerStartBtn').classList.add('danger');
+
+    sendStopwatchFrameToMatrix();
+    stopwatchTimer = setInterval(() => {
+      stopwatchSecs++;
+      updateTimerDisplay();
+      appStateMachine.updateBadge();
+      sendStopwatchFrameToMatrix();
+    }, 1000);
+  }
+
+  function pauseTimerOrStopwatch() {
+    timerActive = false;
+    stopwatchActive = false;
+    if (timerTimer) { clearInterval(timerTimer); timerTimer = null; }
+    if (stopwatchTimer) { clearInterval(stopwatchTimer); stopwatchTimer = null; }
+    document.getElementById('timerStartBtn').innerText = "▶ Старт";
+    document.getElementById('timerStartBtn').classList.remove('danger');
+  }
+
+  function resetTimerOrStopwatch() {
+    pauseTimerOrStopwatch();
+    if (timerMode === 'timer') {
+      timerRemainingSecs = timerTotalSecs;
+    } else {
+      stopwatchSecs = 0;
+    }
+    updateTimerDisplay();
+    showToast("Сброшено");
+  }
+
+  function sendTimerFrameToMatrix() {
+    const tStr = formatTimeMinSec(timerRemainingSecs);
+    sendBleRaw(`TP:1,00f0ff,000000,000000,60,5,0,1,3,1\n`);
+    sendBleRaw(`T:${tStr}\n`);
+  }
+
+  function sendStopwatchFrameToMatrix() {
+    const tStr = formatTimeMinSec(stopwatchSecs);
+    sendBleRaw(`TP:1,00ff66,000000,000000,60,5,0,1,3,1\n`);
+    sendBleRaw(`T:${tStr}\n`);
+  }
+
+  function playTimerDoneSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.setValueAtTime(1174, ctx.currentTime + 0.15);
+      osc.frequency.setValueAtTime(1760, ctx.currentTime + 0.3);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.6);
+    } catch(e) {}
+  }
+
+  // ==========================================
+  // --- КАЛЕНДАРЬ, ДАТА И ОБРАТНЫЙ ОТСЧЕТ ---
+  // ==========================================
+  let datePreset = 'today';
+  let dateStreamTimer = null;
+
+  function setDatePreset(preset) {
+    datePreset = preset;
+    document.getElementById('dateOptToday').classList.toggle('active', preset === 'today');
+    document.getElementById('dateOptNY').classList.toggle('active', preset === 'newyear');
+    document.getElementById('dateOptCustom').classList.toggle('active', preset === 'custom');
+    document.getElementById('customEventWrap').style.display = (preset === 'custom' ? 'flex' : 'none');
+    updateDatePreview();
+  }
+
+  function getFormattedDateString() {
+    const now = new Date();
+    const day = now.getDate();
+    const months = ["ЯНВ", "ФЕВ", "МАР", "АПР", "МАЙ", "ИЮН", "ИЮЛ", "АВГ", "СЕН", "ОКТ", "НОЯ", "ДЕК"];
+    const weekdays = ["ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"];
+    return `${day} ${months[now.getMonth()]} ${weekdays[now.getDay()]}`;
+  }
+
+  function getDaysToNewYear() {
+    const now = new Date();
+    const nextYear = new Date(now.getFullYear() + 1, 0, 1);
+    const diffDays = Math.ceil((nextYear - now) / (1000 * 60 * 60 * 24));
+    return `🎄 ДО НГ: ${diffDays} ДН`;
+  }
+
+  function getDateText() {
+    if (datePreset === 'today') {
+      return getFormattedDateString();
+    } else if (datePreset === 'newyear') {
+      return getDaysToNewYear();
+    } else if (datePreset === 'custom') {
+      const name = document.getElementById('customEventName').value.trim() || "СОБЫТИЕ";
+      const dateVal = document.getElementById('customEventDate').value;
+      if (!dateVal) return `${name}`;
+      const target = new Date(dateVal);
+      const now = new Date();
+      const diffDays = Math.ceil((target - now) / (1000 * 60 * 60 * 24));
+      return `${name}: ${diffDays} ДН`;
+    }
+    return getFormattedDateString();
+  }
+
+  function updateDatePreview() {
+    const preview = document.getElementById('datePreview');
+    if (preview) preview.innerText = getDateText();
+  }
+
+  function sendDateOnce() {
+    const text = getDateText();
+    updateDatePreview();
+    if (datePreset === 'today') {
+      sendBleRaw(`TP:1,00ff66,000000,000000,65,5,0,1,3,1\n`);
+    } else {
+      sendBleRaw(`TP:0,00f0ff,ff0080,ffe600,65,0,0,1,3,0\n`);
+    }
+    sendBleRaw(`T:${text}\n`);
+    showToast("Дата отправлена: " + text);
+  }
+
+  function toggleDateStream() {
+    if (dateStreamTimer) {
+      clearInterval(dateStreamTimer);
+      dateStreamTimer = null;
+      document.getElementById('dateStreamBtn').innerText = "▶ Транслировать дату";
+      document.getElementById('dateStreamBtn').classList.remove('danger');
+      appStateMachine.setState('IDLE');
+      showToast("Трансляция даты остановлена");
+    } else {
+      stopAllStreams();
+      appStateMachine.setState('DATE', getDateText());
+      sendDateOnce();
+      dateStreamTimer = setInterval(sendDateOnce, 30000);
+      document.getElementById('dateStreamBtn').innerText = "⏹ Остановить дату";
+      document.getElementById('dateStreamBtn').classList.add('danger');
+      showToast("Трансляция даты запущена!");
+    }
+  }
+
+  // ==========================================
+  // --- БЫСТРЫЕ СТАТУСЫ ДЛЯ СТОЛА ---
+  // ==========================================
+  function applyDeskStatus(type) {
+    stopAllStreams();
+    let text = "";
+    let tp = "";
+    let label = "";
+
+    if (type === 'busy') {
+      text = "⛔ НЕ БЕСПОКОИТЬ";
+      tp = "TP:1,ff0033,000000,000000,70,3,0,1,3,0\n";
+      label = "НЕ БЕСПОКОИТЬ";
+    } else if (type === 'coffee') {
+      text = "☕ НА КОФЕ";
+      tp = "TP:1,ffaa00,000000,000000,65,5,0,1,3,1\n";
+      label = "НА КОФЕ";
+    } else if (type === 'call') {
+      text = "🎧 НА СОЗВОНЕ";
+      tp = "TP:1,cc44ff,000000,000000,65,5,0,1,3,1\n";
+      label = "НА СОЗВОНЕ";
+    } else if (type === 'work') {
+      text = "💻 В РАБОТЕ";
+      tp = "TP:1,00ff88,000000,000000,65,5,0,1,3,1\n";
+      label = "В РАБОТЕ";
+    } else if (type === 'afk') {
+      text = "🚪 ОТОШЕЛ (AFK)";
+      tp = "TP:1,00f0ff,000000,000000,65,1,0,1,3,0\n";
+      label = "ОТОШЕЛ (AFK)";
+    } else if (type === 'fire') {
+      text = "🔥 ДЕДЛАЙН!";
+      tp = "TP:4,ff5500,ff0000,ffff00,60,4,2,1,3,0\n";
+      label = "ДЕДЛАЙН";
+    }
+
+    appStateMachine.setState('STATUS_DESK', label);
+    sendBleRaw(tp);
+    sendBleRaw(`T:${text}\n`);
+    showToast(`Статус: ${label}`);
+  }
+
+  // ==========================================
   // --- КОМБИНИРОВАННЫЙ СМАРТ-ИНФОРМЕР ---
   // ==========================================
-  let comboOptions = { time: true, weather: true, rates: true };
+  let comboOptions = { time: true, date: true, weather: true, rates: true, newyear: false };
   let comboDisplayMode = 'ticker'; // 'ticker' (бегущая строка) или 'slides' (смена экранов)
   let comboTimer = null;
   let comboSlideIdx = 0;
@@ -1042,6 +1585,9 @@
     if (comboOptions.time) {
       sections.push(`🕒 ${getFormattedTime()}`);
     }
+    if (comboOptions.date) {
+      sections.push(`📅 ${getFormattedDateString()}`);
+    }
     if (comboOptions.weather) {
       const city = document.getElementById('cityInput').value.trim() || "Tashkent";
       const wStr = await fetchWeatherString(city);
@@ -1054,6 +1600,9 @@
       if (cStr) {
         sections.push(cStr.trim());
       }
+    }
+    if (comboOptions.newyear) {
+      sections.push(getDaysToNewYear());
     }
     if (sections.length === 0) return null;
     return sections.join('   *   ') + "   ";
@@ -1073,8 +1622,10 @@
   async function stepComboSlide() {
     const activeSlides = [];
     if (comboOptions.time) activeSlides.push('time');
+    if (comboOptions.date) activeSlides.push('date');
     if (comboOptions.weather) activeSlides.push('weather');
     if (comboOptions.rates) activeSlides.push('rates');
+    if (comboOptions.newyear) activeSlides.push('newyear');
 
     if (activeSlides.length === 0) return;
     const cur = activeSlides[comboSlideIdx % activeSlides.length];
@@ -1082,10 +1633,15 @@
 
     if (cur === 'time') {
       sendClockOnce();
+    } else if (cur === 'date') {
+      sendDateOnce();
     } else if (cur === 'weather') {
       fetchAndSendWeather();
     } else if (cur === 'rates') {
       fetchAndSendCurrenciesOnce();
+    } else if (cur === 'newyear') {
+      sendBleRaw(`TP:0,ffb700,00f0ff,ff0080,65,0,0,1,3,0\n`);
+      sendBleRaw(`T:${getDaysToNewYear()}\n`);
     }
   }
 
@@ -1095,15 +1651,14 @@
       return;
     }
     stopAllStreams();
+    appStateMachine.setState('COMBO');
 
     if (comboDisplayMode === 'ticker') {
       sendComboOnce();
-      // Обновление бегущей строки каждые 40 секунд
       comboTimer = setInterval(sendComboOnce, 40000);
     } else {
       comboSlideIdx = 0;
       stepComboSlide();
-      // Смена экранов-слайдов каждые 7 секунд
       comboTimer = setInterval(stepComboSlide, 7000);
     }
 
@@ -1235,8 +1790,10 @@
       currencyTimer = null;
       document.getElementById('ratesStreamBtn').innerText = "▶ Транслировать курсы";
       document.getElementById('ratesStreamBtn').classList.remove('danger');
+      appStateMachine.setState('IDLE');
     } else {
       stopAllStreams();
+      appStateMachine.setState('RATES');
       fetchAndSendCurrenciesOnce();
       currencyTimer = setInterval(fetchAndSendCurrenciesOnce, 60000); // каждую минуту
       document.getElementById('ratesStreamBtn').innerText = "⏹ Остановить курсы";
@@ -1307,8 +1864,10 @@
       weatherTimer = null;
       document.getElementById('weatherStreamBtn').innerText = "▶ Транслировать погоду";
       document.getElementById('weatherStreamBtn').classList.remove('danger');
+      appStateMachine.setState('IDLE');
     } else {
       stopAllStreams();
+      appStateMachine.setState('WEATHER');
       fetchAndSendWeather();
       weatherTimer = setInterval(fetchAndSendWeather, 180000); // каждые 3 мин
       document.getElementById('weatherStreamBtn').innerText = "⏹ Остановить погоду";
@@ -1425,9 +1984,11 @@
   async function toggleMicStream() {
     if (micTimer) {
       stopMicStream();
+      appStateMachine.setState('IDLE');
       return;
     }
     stopAllStreams();
+    appStateMachine.setState('MIC_VU');
 
     try {
       audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -1511,6 +2072,9 @@
     if (currencyTimer) { clearInterval(currencyTimer); currencyTimer = null; }
     if (weatherTimer) { clearInterval(weatherTimer); weatherTimer = null; }
     if (comboTimer) stopComboStream();
+    if (timerTimer) { clearInterval(timerTimer); timerTimer = null; timerActive = false; }
+    if (stopwatchTimer) { clearInterval(stopwatchTimer); stopwatchTimer = null; stopwatchActive = false; }
+    if (dateStreamTimer) { clearInterval(dateStreamTimer); dateStreamTimer = null; }
     if (micTimer) stopMicStream();
     if (animStreamTimer) stopStreamCustomAnim();
 
@@ -1522,6 +2086,10 @@
     if (wBtn) { wBtn.innerText = "▶ Транслировать погоду"; wBtn.classList.remove('danger'); }
     const cmbBtn = document.getElementById('comboStreamBtn');
     if (cmbBtn) { cmbBtn.innerText = "▶ Запустить Смарт-Информер"; cmbBtn.classList.remove('danger'); }
+    const tmBtn = document.getElementById('timerStartBtn');
+    if (tmBtn) { tmBtn.innerText = "▶ Старт"; tmBtn.classList.remove('danger'); }
+    const dtBtn = document.getElementById('dateStreamBtn');
+    if (dtBtn) { dtBtn.innerText = "▶ Транслировать дату"; dtBtn.classList.remove('danger'); }
     const cmbStat = document.getElementById('comboStatus');
     if (cmbStat) cmbStat.innerText = "Остановлен";
   }
@@ -1556,6 +2124,7 @@
     stopAllStreams();
     let txt = document.getElementById('textInput').value.trim();
     if (!txt) txt = " ";
+    appStateMachine.setState('TEXT', txt.length > 15 ? (txt.substring(0, 14) + '...') : txt);
     sendBleRaw(`TP:${textState.mode},${getColorHex('tc1')},${getColorHex('tc2')},${getColorHex('tc3')},${textState.speed},${currentStyle},${currentBg},${seamlessLoop ? 1 : 0},${loopGap},${currentFont}\n`);
     sendBleRaw(`T:${txt}\n`);
     showToast("Текст отправлен!");
@@ -1808,9 +2377,11 @@
   function toggleStreamCustomAnim() {
     if (animStreamTimer) {
       stopStreamCustomAnim();
+      appStateMachine.setState('IDLE');
       return;
     }
     stopAllStreams();
+    appStateMachine.setState('ANIM');
     let streamIdx = 0;
     const interval = Math.round(1000 / fps);
     animStreamTimer = setInterval(() => {
@@ -2111,13 +2682,18 @@
   // ==========================================
   let effectSpeedMs = 55;
 
+  const effectNames = ["🐱 Нян-Кэт", "🟩 Матрица", "🔥 Огонь", "📊 Эквалайзер", "🟡 Пакман", "💓 Сердце", "🌀 Плазма"];
+
   function startEffectBle(id) {
     stopAllStreams();
+    const effName = effectNames[id] || ("№" + id);
+    appStateMachine.setState('EFFECT', effName);
     document.querySelectorAll('.effect-card').forEach((c, i) => {
       c.classList.toggle('active', i === id);
     });
-    sendBleRaw(`EFF:${id},${effectSpeedMs}\n`);
-    showToast("Эффект запущен!");
+    const spd = textState.speed || effectSpeedMs;
+    sendBleRaw(`EFF:${id},${spd}\n`);
+    showToast("Запущен эффект: " + effName);
   }
 
   function updateEffectSpeed(v) {
