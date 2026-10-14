@@ -221,6 +221,12 @@ uint8_t getGlyphColsStandard(uint32_t u, uint8_t* out) {
       out[0]=0x04; out[1]=0x0A; out[2]=0x04; out[3]=0x0A; return 4;
     case 0x00BB: // »
       out[0]=0x0A; out[1]=0x04; out[2]=0x0A; out[3]=0x04; return 4;
+    case 0x00B0: // ° градус (квадратик 2х2 в верхнем углу)
+      out[0]=0x03; out[1]=0x03; return 2;
+    case 0x20BD: // ₽ рубль
+      out[0]=0x1F; out[1]=0x0A; out[2]=0x0A; out[3]=0x04; return 4;
+    case 0x20AC: // € евро
+      out[0]=0x0E; out[1]=0x1F; out[2]=0x15; out[3]=0x11; return 4;
 
     // --- ОТОБРАННЫЕ ЧЕТКИЕ ЗНАЧКИ И СМАЙЛЫ (5x5) ---
     case 0x1F642: case 0x1F600: case 0x1F60A: case 0x1F603: case 0x1F604: // 🙂 Улыбка
@@ -558,6 +564,11 @@ void prepareText(String str) {
     }
   }
 
+  // Убираем завершающий пробел у последнего символа для точного центрирования
+  if (textLength > 0 && textBuffer[textLength - 1] == 0x00) {
+    textLength--;
+  }
+
   if (textLength == 0) {
     textBuffer[textLength++] = 0x00;
   }
@@ -658,6 +669,54 @@ void sendBleResponse(String msg) {
     pBleTxChar->setValue((uint8_t*)msg.c_str(), msg.length());
     pBleTxChar->notify();
   }
+}
+
+// -------------------------------------------------------------
+// ОТОБРАЖЕНИЕ 10 СТОЛБИКОВ ЭКВАЛАЙЗЕРА С ПРОМЕЖУТКОМ В 1 ПИКСЕЛЬ
+// -------------------------------------------------------------
+void renderVuBars(uint8_t style, const String& heights) {
+  FastLED.clear();
+  int numBars = min((int)heights.length(), 10);
+  for (int b = 0; b < numBars; b++) {
+    int col = b * 2; // Четные колонки (0, 2, 4, ... 18) - 10 столбиков
+    // Нечетные колонки (1, 3, 5, ... 19) остаются 0x00 (1px черный промежуток)
+    int h = heights.charAt(b) - '0';
+    h = constrain(h, 0, 5);
+
+    for (int lvl = 1; lvl <= h; lvl++) {
+      int y = 5 - lvl; // lvl 1 -> y=4 (низ), lvl 5 -> y=0 (верх)
+      CRGB c;
+      if (style == 0) { // Студийный VU: Зеленый -> Лайм -> Желтый -> Оранжевый -> Красный
+        if (lvl == 1) c = CRGB(0, 255, 30);
+        else if (lvl == 2) c = CRGB(160, 255, 0);
+        else if (lvl == 3) c = CRGB(255, 200, 0);
+        else if (lvl == 4) c = CRGB(255, 80, 0);
+        else c = CRGB(255, 0, 0);
+      } else if (style == 1) { // Cyberpunk Neon: Синий -> Циан -> Пурпур -> Розовый -> Белый
+        if (lvl == 1) c = CRGB(0, 100, 255);
+        else if (lvl == 2) c = CRGB(0, 240, 255);
+        else if (lvl == 3) c = CRGB(200, 0, 255);
+        else if (lvl == 4) c = CRGB(255, 0, 150);
+        else c = CRGB(255, 255, 255);
+      } else if (style == 2) { // Fire: Бордовый -> Оранжевый -> Желтый -> Белый огонь
+        if (lvl == 1) c = CRGB(180, 0, 0);
+        else if (lvl == 2) c = CRGB(255, 40, 0);
+        else if (lvl == 3) c = CRGB(255, 120, 0);
+        else if (lvl == 4) c = CRGB(255, 210, 0);
+        else c = CRGB(255, 255, 220);
+      } else if (style == 3) { // Ice: Глубокий синий -> Аква -> Голубой -> Белый лед
+        if (lvl == 1) c = CRGB(0, 40, 180);
+        else if (lvl == 2) c = CRGB(0, 140, 255);
+        else if (lvl == 3) c = CRGB(0, 240, 255);
+        else if (lvl == 4) c = CRGB(150, 255, 255);
+        else c = CRGB(255, 255, 255);
+      } else { // Rainbow: Градиент по частотным колонкам
+        c = CHSV(b * 25, 255, 160 + lvl * 19);
+      }
+      leds[XY(col, y)] = c;
+    }
+  }
+  FastLED.show();
 }
 
 void processBleCommand(String cmd) {
@@ -762,6 +821,19 @@ void processBleCommand(String cmd) {
       }
     }
     sendBleResponse("OK_LP");
+  } else if (cmd.startsWith("VU:")) {
+    // VU:<style>,<10_digits> e.g. VU:0,0123454321
+    int comma = cmd.indexOf(',', 3);
+    uint8_t style = 0;
+    String hStr;
+    if (comma != -1) {
+      style = cmd.substring(3, comma).toInt();
+      hStr = cmd.substring(comma + 1);
+    } else {
+      hStr = cmd.substring(3);
+    }
+    renderVuBars(style, hStr);
+    appMode = MODE_RAW_STREAM;
   } else if (cmd.startsWith("RAW:")) {
     String hex = cmd.substring(4);
     int len = hex.length();
