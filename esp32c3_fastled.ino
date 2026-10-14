@@ -16,11 +16,12 @@ Preferences prefs;
 
 // --- Режимы работы устройства ---
 enum AppMode {
-  MODE_TEXT = 0,
-  MODE_EFFECT = 1,
-  MODE_CUSTOM_ANIM = 2,
-  MODE_DRAW_LIVE = 3,
-  MODE_RAW_STREAM = 4
+  MODE_IDLE = 0,
+  MODE_TEXT = 1,
+  MODE_EFFECT = 2,
+  MODE_CUSTOM_ANIM = 3,
+  MODE_DRAW_LIVE = 4,
+  MODE_RAW_STREAM = 5
 };
 
 AppMode appMode = MODE_TEXT;
@@ -221,6 +222,16 @@ uint8_t getGlyphColsStandard(uint32_t u, uint8_t* out) {
       out[0]=0x04; out[1]=0x0A; out[2]=0x04; out[3]=0x0A; return 4;
     case 0x00BB: // »
       out[0]=0x0A; out[1]=0x04; out[2]=0x0A; out[3]=0x04; return 4;
+    case 0x00B0: // ° градус (квадратик 2х2 в верхнем углу)
+      out[0]=0x03; out[1]=0x03; return 2;
+    case 0x20BD: // ₽ рубль
+      out[0]=0x1F; out[1]=0x0A; out[2]=0x0A; out[3]=0x04; return 4;
+    case 0x20AC: // € евро
+      out[0]=0x0E; out[1]=0x1F; out[2]=0x15; out[3]=0x11; return 4;
+    case 0x00A5: // ¥ китайский юань (5x4)
+      out[0]=0x0D; out[1]=0x1E; out[2]=0x1E; out[3]=0x0D; return 4;
+    case 0x20B8: // ₸ казахстанский тенге (5x4)
+      out[0]=0x03; out[1]=0x1F; out[2]=0x1F; out[3]=0x03; return 4;
 
     // --- ОТОБРАННЫЕ ЧЕТКИЕ ЗНАЧКИ И СМАЙЛЫ (5x5) ---
     case 0x1F642: case 0x1F600: case 0x1F60A: case 0x1F603: case 0x1F604: // 🙂 Улыбка
@@ -558,6 +569,11 @@ void prepareText(String str) {
     }
   }
 
+  // Убираем завершающий пробел у последнего символа для точного центрирования
+  if (textLength > 0 && textBuffer[textLength - 1] == 0x00) {
+    textLength--;
+  }
+
   if (textLength == 0) {
     textBuffer[textLength++] = 0x00;
   }
@@ -660,6 +676,71 @@ void sendBleResponse(String msg) {
   }
 }
 
+// -------------------------------------------------------------
+// ОТОБРАЖЕНИЕ 10 СТОЛБИКОВ ЭКВАЛАЙЗЕРА С ПРОМЕЖУТКОМ В 1 ПИКСЕЛЬ
+// -------------------------------------------------------------
+void renderVuBars(uint8_t style, const String& heights) {
+  FastLED.clear();
+  int numBars = min((int)heights.length(), 10);
+  for (int b = 0; b < numBars; b++) {
+    int col = b * 2; // Четные колонки (0, 2, 4, ... 18) - 10 столбиков
+    // Нечетные колонки (1, 3, 5, ... 19) остаются 0x00 (1px черный промежуток)
+    int h = heights.charAt(b) - '0';
+    h = constrain(h, 0, 5);
+
+    for (int lvl = 1; lvl <= h; lvl++) {
+      int y = 5 - lvl; // lvl 1 -> y=4 (низ), lvl 5 -> y=0 (верх)
+      CRGB c;
+      if (style == 0) { // Студийный VU: Зеленый -> Лайм -> Желтый -> Оранжевый -> Красный
+        if (lvl == 1) c = CRGB(0, 255, 30);
+        else if (lvl == 2) c = CRGB(160, 255, 0);
+        else if (lvl == 3) c = CRGB(255, 200, 0);
+        else if (lvl == 4) c = CRGB(255, 80, 0);
+        else c = CRGB(255, 0, 0);
+      } else if (style == 1) { // Cyberpunk Neon: Синий -> Циан -> Пурпур -> Розовый -> Белый
+        if (lvl == 1) c = CRGB(0, 100, 255);
+        else if (lvl == 2) c = CRGB(0, 240, 255);
+        else if (lvl == 3) c = CRGB(200, 0, 255);
+        else if (lvl == 4) c = CRGB(255, 0, 150);
+        else c = CRGB(255, 255, 255);
+      } else if (style == 2) { // Fire: Бордовый -> Оранжевый -> Желтый -> Белый огонь
+        if (lvl == 1) c = CRGB(180, 0, 0);
+        else if (lvl == 2) c = CRGB(255, 40, 0);
+        else if (lvl == 3) c = CRGB(255, 120, 0);
+        else if (lvl == 4) c = CRGB(255, 210, 0);
+        else c = CRGB(255, 255, 220);
+      } else if (style == 3) { // Ice: Глубокий синий -> Аква -> Голубой -> Белый лед
+        if (lvl == 1) c = CRGB(0, 40, 180);
+        else if (lvl == 2) c = CRGB(0, 140, 255);
+        else if (lvl == 3) c = CRGB(0, 240, 255);
+        else if (lvl == 4) c = CRGB(150, 255, 255);
+        else c = CRGB(255, 255, 255);
+      } else { // Rainbow: Градиент по частотным колонкам
+        c = CHSV(b * 25, 255, 160 + lvl * 19);
+      }
+      leds[XY(col, y)] = c;
+    }
+  }
+  FastLED.show();
+}
+
+uint8_t lastRenderedEffect = 255;
+uint32_t effectTicks = 0;
+
+void switchAppMode(AppMode newMode) {
+  if (appMode != newMode) {
+    appMode = newMode;
+    FastLED.clear();
+    FastLED.show();
+    scrollPos = 0;
+    lastTextStep = 0;
+    lastEffectStep = 0;
+    lastCustomFrameTime = 0;
+    lastRenderedEffect = 255;
+    effectTicks = 0;
+  }
+}
+
 void processBleCommand(String cmd) {
   if (cmd == "PING") {
     sendBleResponse("PONG");
@@ -686,8 +767,7 @@ void processBleCommand(String cmd) {
   if (cmd.startsWith("T:")) {
     currentText = cmd.substring(2);
     prepareText(currentText);
-    scrollPos = 0;
-    appMode = MODE_TEXT;
+    switchAppMode(MODE_TEXT);
     sendBleResponse("OK_T");
   } else if (cmd.startsWith("TP:")) {
     // TP:mode,c1,c2,c3,speed,style,bg,seamless,gap
@@ -718,7 +798,7 @@ void processBleCommand(String cmd) {
         textFont = constrain(tokens[9].toInt(), 0, 4);
       }
       prepareText(currentText);
-      appMode = MODE_TEXT;
+      switchAppMode(MODE_TEXT);
       sendBleResponse("OK_TP");
     }
   } else if (cmd.startsWith("FONT:")) {
@@ -742,7 +822,7 @@ void processBleCommand(String cmd) {
     } else {
       currentEffect = cmd.substring(4).toInt();
     }
-    appMode = MODE_EFFECT;
+    switchAppMode(MODE_EFFECT);
     sendBleResponse("OK_EFF");
   } else if (cmd.startsWith("PAUSE:")) {
     textRunning = (cmd.substring(6).toInt() == 1);
@@ -758,10 +838,37 @@ void processBleCommand(String cmd) {
         liveDrawBuffer[XY(x, y)] = c;
         leds[XY(x, y)] = c;
         FastLED.show();
-        appMode = MODE_DRAW_LIVE;
+        switchAppMode(MODE_DRAW_LIVE);
       }
     }
     sendBleResponse("OK_LP");
+  } else if (cmd.startsWith("SPEED:")) {
+    uint16_t spd = constrain(cmd.substring(6).toInt(), 10, 300);
+    scrollDelay = spd;
+    effectSpeed = spd;
+    customFps = constrain(1000 / spd, 1, 30);
+    prefs.putUShort("speed", scrollDelay);
+    sendBleResponse("OK_SPEED;" + String(spd));
+  } else if (cmd == "STOP") {
+    switchAppMode(MODE_IDLE);
+    sendBleResponse("OK_STOP");
+  } else if (cmd == "SAVE_SETTINGS") {
+    prefs.putUChar("bright", brightness);
+    prefs.putUShort("speed", scrollDelay);
+    sendBleResponse("OK_SAVE_SETTINGS");
+  } else if (cmd.startsWith("VU:")) {
+    // VU:<style>,<10_digits> e.g. VU:0,0123454321
+    int comma = cmd.indexOf(',', 3);
+    uint8_t style = 0;
+    String hStr;
+    if (comma != -1) {
+      style = cmd.substring(3, comma).toInt();
+      hStr = cmd.substring(comma + 1);
+    } else {
+      hStr = cmd.substring(3);
+    }
+    switchAppMode(MODE_RAW_STREAM);
+    renderVuBars(style, hStr);
   } else if (cmd.startsWith("RAW:")) {
     String hex = cmd.substring(4);
     int len = hex.length();
@@ -771,11 +878,13 @@ void processBleCommand(String cmd) {
       leds[XY(x, y)] = parseHexColor(hex.substring(i * 6, i * 6 + 6));
     }
     FastLED.show();
-    appMode = MODE_RAW_STREAM;
+    switchAppMode(MODE_RAW_STREAM);
   } else if (cmd == "STATUS?") {
     String st = "STATUS:{\"text\":\"" + currentText + "\",";
     st += "\"bright\":" + String(brightness) + ",";
     st += "\"speed\":" + String(scrollDelay) + ",";
+    st += "\"appMode\":" + String((int)appMode) + ",";
+    st += "\"eff\":" + String(currentEffect) + ",";
     st += "\"mode\":" + String(textColMode) + ",";
     st += "\"style\":" + String(textStyle) + ",";
     st += "\"bg\":" + String(textBgMode) + ",";
@@ -830,10 +939,11 @@ void processBleCommand(String cmd) {
     customFps = constrain(cmd.substring(10).toInt(), 1, 30);
     customCurrentFrame = 0;
     customAnimPlaying = true;
-    appMode = MODE_CUSTOM_ANIM;
+    switchAppMode(MODE_CUSTOM_ANIM);
     sendBleResponse("OK_ANIM_PLAY");
   } else if (cmd == "ANIM_STOP") {
     customAnimPlaying = false;
+    switchAppMode(MODE_TEXT);
     sendBleResponse("OK_ANIM_STOP");
   }
 }
@@ -1188,8 +1298,12 @@ void loop() {
     sendBleResponse(bleAuthenticated ? "OK_BEAT" : "PING");
   }
 
+  // 0. РЕЖИМ ОЖИДАНИЯ / ВЫКЛЮЧЕНО (MODE_IDLE)
+  if (appMode == MODE_IDLE) {
+    // Ничего не рендерим
+  }
   // 1. РЕЖИМ БЕГУЩЕЙ СТРОКИ / ТЕКСТА V2
-  if (appMode == MODE_TEXT) {
+  else if (appMode == MODE_TEXT) {
     if (now - lastTextStep >= scrollDelay) {
       lastTextStep = now;
       FastLED.clear();
@@ -1290,9 +1404,15 @@ void loop() {
 
   // 2. РЕЖИМ ВСТРОЕННЫХ ЭФФЕКТОВ
   else if (appMode == MODE_EFFECT) {
+    if (currentEffect != lastRenderedEffect) {
+      lastRenderedEffect = currentEffect;
+      effectTicks = 0;
+      FastLED.clear();
+      FastLED.show();
+    }
+
     if (now - lastEffectStep >= effectSpeed) {
       lastEffectStep = now;
-      static uint32_t effectTicks = 0;
       effectTicks++;
 
       switch (currentEffect) {
