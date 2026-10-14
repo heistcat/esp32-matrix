@@ -500,6 +500,7 @@
         <div class="slider-head"><span>Яркость всех диодов</span><span class="slider-val" id="globalBrightVal">40</span></div>
         <input type="range" id="globalBright" min="5" max="255" value="40" oninput="updateBrightBle(this.value)">
       </div>
+      <button class="sec" style="margin-top:6px;" onclick="saveBrightBle()">💾 Сохранить яркость во Flash ESP32</button>
     </div>
 
     <div class="card">
@@ -508,6 +509,14 @@
       <div class="input-row">
         <input type="password" id="newPassInput" placeholder="Новый PIN...">
         <button onclick="changeBlePassword()">Сменить</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Управление устройством</div>
+      <div class="grid-2">
+        <button class="sec" onclick="saveTextBle()">💾 Сохранить текст во Flash</button>
+        <button class="danger" onclick="rebootEspBle()">🔄 Перезагрузить ESP32</button>
       </div>
     </div>
 
@@ -1176,9 +1185,21 @@
   }
 
   function saveTextBle() {
-    // Вызывает сохранение во Flash на ESP32
     applyTextBle();
-    showToast("💾 Настройки отправлены в ESP32");
+    sendBleRaw("SAVE_TEXT\n");
+    showToast("💾 Текст и стиль сохранены во Flash ESP32");
+  }
+
+  function saveBrightBle() {
+    sendBleRaw("SAVE_BRIGHT\n");
+    showToast("💾 Яркость сохранена во Flash ESP32");
+  }
+
+  function rebootEspBle() {
+    if (confirm("Перезагрузить контроллер ESP32?")) {
+      sendBleRaw("REBOOT\n");
+      showToast("🔄 Перезагрузка ESP32...");
+    }
   }
 
   // ==========================================
