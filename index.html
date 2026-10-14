@@ -102,9 +102,10 @@
   .eff-actions { display: flex; gap: 8px; }
   .eff-actions button { flex: 1; padding: 8px 12px; font-size: 12px; }
 
-  /* Live Stream Visualizer */
-  .vu-meter-bar { display: flex; gap: 2px; height: 60px; align-items: flex-end; background: #060912; padding: 6px; border-radius: 10px; border: 1px solid var(--border); }
-  .vu-col { flex: 1; background: var(--accent-grad); border-radius: 2px; transition: height 0.05s ease; min-height: 4px; }
+  /* Live Stream Visualizer 10 bars */
+  .vu-meter-bar-10 { display: grid; grid-template-columns: repeat(10, 1fr); gap: 7px; height: 75px; background: #060912; padding: 8px; border-radius: 12px; border: 1px solid var(--border); }
+  .vu-col-10 { display: flex; flex-direction: column-reverse; gap: 3px; height: 100%; justify-content: flex-start; }
+  .vu-seg { flex: 1; border-radius: 2px; background: #141c2e; transition: background 0.05s ease, box-shadow 0.05s ease; }
 
   /* Modal */
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
@@ -151,11 +152,34 @@
         <span id="clockPreview" style="color:var(--accent); font-weight:700;">12:00</span>
       </div>
       <p style="font-size:12px; color:var(--text-dim);">Транслирует точное время вашего телефона прямо на матрицу без интернета на ESP32.</p>
+      
+      <div class="card-title" style="margin-top:2px;">Формат отображения</div>
       <div class="grid-2">
         <div class="btn-select active" id="clockModeCenter" onclick="setClockFormat(5)">🎯 Статичные (по центру)</div>
         <div class="btn-select" id="clockModeScroll" onclick="setClockFormat(0)">➡️ Бегущая строка</div>
       </div>
-      <div class="grid-2">
+
+      <div class="card-title" style="margin-top:2px;">Шрифт часов</div>
+      <div class="grid-3">
+        <div class="btn-select active" id="clkFont1" onclick="setClockFont(1)">📏 Узкий 3px (Идеал)</div>
+        <div class="btn-select" id="clkFont3" onclick="setClockFont(3)">📟 7-Сегмент</div>
+        <div class="btn-select" id="clkFont0" onclick="setClockFont(0)">📐 Стандарт</div>
+      </div>
+
+      <div class="card-title" style="margin-top:2px;">Цвет цифр</div>
+      <div class="grid-5">
+        <div class="btn-select active" id="clkColCyan" onclick="setClockColor('cyan')">⚡ Циан</div>
+        <div class="btn-select" id="clkColAmber" onclick="setClockColor('amber')">🟡 Янтарный</div>
+        <div class="btn-select" id="clkColGreen" onclick="setClockColor('green')">🟢 Лайм</div>
+        <div class="btn-select" id="clkColWhite" onclick="setClockColor('white')">⚪ Белый</div>
+        <div class="btn-select" id="clkColRainbow" onclick="setClockColor('rainbow')">🌈 Радуга</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; font-size:12px; margin-top:2px;">
+        <span style="color:var(--text-dim);">Свой цвет:</span>
+        <input type="color" id="clockCustomColor" value="#00f0ff" onchange="setClockCustomColor(this.value)">
+      </div>
+
+      <div class="grid-2" style="margin-top:4px;">
         <button id="clockStreamBtn" onclick="toggleClockStream()">▶ Включить трансляцию часов</button>
         <button class="sec" onclick="sendClockOnce()">Отправить 1 раз</button>
       </div>
@@ -164,7 +188,7 @@
     <!-- КРИПТОВАЛЮТЫ И КУРСЫ -->
     <div class="card">
       <div class="card-title">
-        <span>💰 Курсы криптовалют (CoinGecko Live)</span>
+        <span>💰 Курсы криптовалют (Binance Live / CoinGecko)</span>
         <span id="cryptoStatus" style="font-size:11px; color:var(--text-dim);">Готово</span>
       </div>
       <div class="grid-4">
@@ -199,11 +223,19 @@
     <div class="card">
       <div class="card-title">
         <span>🎵 Цветомузыка с микрофона смартфона</span>
-        <span id="audioStatus" style="font-size:11px; color:var(--accent);">FFT 20 полос</span>
+        <span id="audioStatus" style="font-size:11px; color:var(--accent);">10 полос (1px зазор)</span>
       </div>
-      <p style="font-size:12px; color:var(--text-dim);">Использует микрофон телефона как спектроанализатор для матрицы в такт музыке!</p>
-      <div class="vu-meter-bar" id="vuMeter">
-        <!-- 20 полос -->
+      <p style="font-size:12px; color:var(--text-dim);">Спектроанализатор реального времени: 10 отдельных полос с промежутком в 1 пиксель и цветными уровнями.</p>
+      <div class="vu-meter-bar-10" id="vuMeter">
+        <!-- 10 колонок со сегментами -->
+      </div>
+      <div class="card-title" style="margin-top:2px;">Стиль подсветки полос</div>
+      <div class="grid-5">
+        <div class="btn-select active" id="vuStyle0" onclick="setVuStyle(0)">🎙️ Студия VU</div>
+        <div class="btn-select" id="vuStyle1" onclick="setVuStyle(1)">⚡ Неон</div>
+        <div class="btn-select" id="vuStyle2" onclick="setVuStyle(2)">🔥 Огонь</div>
+        <div class="btn-select" id="vuStyle3" onclick="setVuStyle(3)">❄️ Лед</div>
+        <div class="btn-select" id="vuStyle4" onclick="setVuStyle(4)">🌈 Радуга</div>
       </div>
       <div class="slider-group">
         <div class="slider-head"><span>Чувствительность микрофона</span><span class="slider-val" id="micGainVal">1.5x</span></div>
@@ -729,22 +761,65 @@
     }
   }
 
-  async function sendBleRaw(str) {
-    if (!bleRxChar) return;
-    try {
-      const data = new TextEncoder().encode(str);
-      const CHUNK_SIZE = 20; // Безопасный размер для BLE ATT MTU 23
-      for (let i = 0; i < data.length; i += CHUNK_SIZE) {
-        const chunk = data.slice(i, i + CHUNK_SIZE);
-        if (bleRxChar.writeValueWithoutResponse) {
-          await bleRxChar.writeValueWithoutResponse(chunk);
-        } else {
-          await bleRxChar.writeValue(chunk);
+  // --- НАДЕЖНАЯ ПОСЛЕДОВАТЕЛЬНАЯ ОЧЕРЕДЬ ЗАПИСИ BLE ---
+  const bleWriteQueue = [];
+  let bleWriting = false;
+
+  function sendBleRaw(str) {
+    if (!bleRxChar) return Promise.resolve();
+
+    return new Promise((resolve, reject) => {
+      // Для потоковых команд визуализатора (VU: или RAW:) не накапливаем очередь!
+      // Если в очереди уже висит неотправленный фрейм визуализатора, заменяем его на самый свежий
+      if (str.startsWith("VU:")) {
+        const idx = bleWriteQueue.findIndex(item => item.str.startsWith("VU:"));
+        if (idx !== -1) {
+          bleWriteQueue[idx].resolve(); // резолвим предыдущий устаревший промис
+          bleWriteQueue[idx] = { str, resolve, reject };
+          return;
+        }
+      } else if (str.startsWith("RAW:")) {
+        const idx = bleWriteQueue.findIndex(item => item.str.startsWith("RAW:"));
+        if (idx !== -1) {
+          bleWriteQueue[idx].resolve();
+          bleWriteQueue[idx] = { str, resolve, reject };
+          return;
         }
       }
-    } catch (e) {
-      console.error("BLE Write error:", e);
+
+      bleWriteQueue.push({ str, resolve, reject });
+      processBleQueue();
+    });
+  }
+
+  async function processBleQueue() {
+    if (bleWriting || !bleRxChar) return;
+    bleWriting = true;
+
+    while (bleWriteQueue.length > 0) {
+      const item = bleWriteQueue.shift();
+      try {
+        const data = new TextEncoder().encode(item.str);
+        const CHUNK_SIZE = 20; // Безопасный размер для BLE ATT MTU 23
+        for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+          const chunk = data.slice(i, i + CHUNK_SIZE);
+          if (bleRxChar.writeValueWithoutResponse) {
+            await bleRxChar.writeValueWithoutResponse(chunk);
+          } else {
+            await bleRxChar.writeValue(chunk);
+          }
+          if (i + CHUNK_SIZE < data.length) {
+            await new Promise(r => setTimeout(r, 6));
+          }
+        }
+        item.resolve();
+      } catch (e) {
+        console.error("BLE Write error:", e);
+        item.reject(e);
+      }
     }
+
+    bleWriting = false;
   }
 
   function requestStatus() {
@@ -822,12 +897,40 @@
   // --- ТАБ 1: СМАРТ-ВИДЖЕТЫ ---
   // ==========================================
   let clockStreamTimer = null;
-  let clockStyle = 5; // static center
+  let clockStyle = 5; // 5: static center, 0: scroll
+  let clockFont = 1;  // 1: narrow 3px (идеально для 20x5)
+  let clockColorPreset = 'cyan';
+  let clockCustomHex = '00f0ff';
 
   function setClockFormat(style) {
     clockStyle = style;
     document.getElementById('clockModeCenter').classList.toggle('active', style === 5);
     document.getElementById('clockModeScroll').classList.toggle('active', style === 0);
+  }
+
+  function setClockFont(f) {
+    clockFont = f;
+    [0, 1, 3].forEach(id => {
+      const el = document.getElementById('clkFont' + id);
+      if (el) el.classList.toggle('active', id === f);
+    });
+  }
+
+  function setClockColor(preset) {
+    clockColorPreset = preset;
+    ['cyan', 'amber', 'green', 'white', 'rainbow'].forEach(p => {
+      const el = document.getElementById('clkCol' + p.charAt(0).toUpperCase() + p.slice(1));
+      if (el) el.classList.toggle('active', p === preset);
+    });
+  }
+
+  function setClockCustomColor(val) {
+    clockCustomHex = val.replace('#', '');
+    clockColorPreset = 'custom';
+    ['cyan', 'amber', 'green', 'white', 'rainbow'].forEach(p => {
+      const el = document.getElementById('clkCol' + p.charAt(0).toUpperCase() + p.slice(1));
+      if (el) el.classList.remove('active');
+    });
   }
 
   function getFormattedTime() {
@@ -840,7 +943,25 @@
   function sendClockOnce() {
     const timeStr = getFormattedTime();
     document.getElementById('clockPreview').innerText = timeStr;
-    sendBleRaw(`TP:${textState.mode},${getColorHex('tc1')},${getColorHex('tc2')},${getColorHex('tc3')},${textState.speed},${clockStyle},${currentBg},1,3\n`);
+
+    let mode = 1; // монохром по умолчанию
+    let c1 = clockCustomHex;
+    let c2 = "000000";
+    let c3 = "000000";
+
+    if (clockColorPreset === 'cyan') {
+      mode = 1; c1 = "00f0ff";
+    } else if (clockColorPreset === 'amber') {
+      mode = 1; c1 = "ffb700";
+    } else if (clockColorPreset === 'green') {
+      mode = 1; c1 = "00ff66";
+    } else if (clockColorPreset === 'white') {
+      mode = 1; c1 = "ffffff";
+    } else if (clockColorPreset === 'rainbow') {
+      mode = 0; // 🌈 радужный режим текста
+    }
+
+    sendBleRaw(`TP:${mode},${c1},${c2},${c3},65,${clockStyle},0,1,3,${clockFont}\n`);
     sendBleRaw(`T:${timeStr}\n`);
     showToast("Время отправлено: " + timeStr);
   }
@@ -862,7 +983,7 @@
     }
   }
 
-  // КРИПТОВАЛЮТЫ
+  // КРИПТОВАЛЮТЫ (БЫСТРЫЙ BINANCE API + COINGECKO FALLBACK)
   let activeCoins = { BTC: true, ETH: true, TON: true, SOL: false };
   let cryptoTimer = null;
 
@@ -872,19 +993,56 @@
   }
 
   async function fetchCryptoString() {
+    document.getElementById('cryptoStatus').innerText = "Запрос курсов...";
+    let prices = {};
+
+    // 1. Быстрый публичный Binance API (без CORS-ограничений и лимитов)
     try {
-      document.getElementById('cryptoStatus').innerText = "Запрос курсов...";
-      const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,the-open-network&vs_currencies=usd');
-      const data = await res.json();
-      let parts = [];
-      if (activeCoins.BTC && data.bitcoin) parts.push(`BTC $${data.bitcoin.usd.toLocaleString()}`);
-      if (activeCoins.ETH && data.ethereum) parts.push(`ETH $${data.ethereum.usd.toLocaleString()}`);
-      if (activeCoins.TON && data['the-open-network']) parts.push(`TON $${data['the-open-network'].usd}`);
-      if (activeCoins.SOL && data.solana) parts.push(`SOL $${data.solana.usd}`);
-      document.getElementById('cryptoStatus').innerText = "Курсы получены";
+      const symbols = [];
+      if (activeCoins.BTC) symbols.push('"BTCUSDT"');
+      if (activeCoins.ETH) symbols.push('"ETHUSDT"');
+      if (activeCoins.SOL) symbols.push('"SOLUSDT"');
+      if (activeCoins.TON) symbols.push('"TONUSDT"');
+
+      if (symbols.length > 0) {
+        const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=[${symbols.join(',')}]`);
+        if (res.ok) {
+          const data = await res.json();
+          for (const item of data) {
+            const sym = item.symbol.replace('USDT', '');
+            prices[sym] = parseFloat(item.price);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Binance API error, fallback to CoinGecko", e);
+    }
+
+    // 2. Резервный CoinGecko (если Binance не ответил)
+    if (Object.keys(prices).length === 0) {
+      try {
+        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,the-open-network&vs_currencies=usd');
+        const data = await res.json();
+        if (data.bitcoin) prices['BTC'] = data.bitcoin.usd;
+        if (data.ethereum) prices['ETH'] = data.ethereum.usd;
+        if (data['the-open-network']) prices['TON'] = data['the-open-network'].usd;
+        if (data.solana) prices['SOL'] = data.solana.usd;
+      } catch(e) {
+        console.error("CoinGecko API error", e);
+      }
+    }
+
+    let parts = [];
+    if (activeCoins.BTC && prices.BTC) parts.push(`BTC $${Math.round(prices.BTC).toLocaleString()}`);
+    if (activeCoins.ETH && prices.ETH) parts.push(`ETH $${Math.round(prices.ETH).toLocaleString()}`);
+    if (activeCoins.TON && prices.TON) parts.push(`TON $${prices.TON.toFixed(2)}`);
+    if (activeCoins.SOL && prices.SOL) parts.push(`SOL $${prices.SOL.toFixed(1)}`);
+
+    if (parts.length > 0) {
+      document.getElementById('cryptoStatus').innerText = "Курсы получены: " + parts.join(' | ');
       return parts.join('   ') + "   ";
-    } catch(e) {
-      document.getElementById('cryptoStatus').innerText = "Ошибка API";
+    } else {
+      document.getElementById('cryptoStatus').innerText = "Ошибка загрузки курсов";
       return null;
     }
   }
@@ -892,7 +1050,7 @@
   async function fetchAndSendCryptoOnce() {
     const str = await fetchCryptoString();
     if (str) {
-      sendBleRaw(`TP:2,${getColorHex('tc1')},${getColorHex('tc2')},${getColorHex('tc3')},60,0,1,1,4\n`);
+      sendBleRaw(`TP:2,00f0ff,ff0080,ffe600,60,0,1,1,4,0\n`);
       sendBleRaw(`T:${str}\n`);
       showToast("Курсы отправлены на матрицу");
     }
@@ -914,11 +1072,10 @@
     }
   }
 
-  // ПОГОДА
+  // ПОГОДА (OPEN-METEO)
   let weatherTimer = null;
   async function fetchWeatherString(city) {
     try {
-      // Геокодинг города через Open-Meteo
       const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=ru`);
       const geoData = await geoRes.json();
       if (!geoData.results || geoData.results.length === 0) return null;
@@ -942,7 +1099,7 @@
     const city = document.getElementById('cityInput').value.trim() || "Moscow";
     const str = await fetchWeatherString(city);
     if (str) {
-      sendBleRaw(`TP:0,00f0ff,ff0080,ffe600,60,0,0,1,3\n`);
+      sendBleRaw(`TP:0,00f0ff,ff0080,ffe600,60,0,0,1,3,0\n`);
       sendBleRaw(`T:${str}\n`);
       showToast("Погода отправлена!");
     } else {
@@ -962,7 +1119,7 @@
         const sign = temp > 0 ? '+' : '';
         const str = `ПОГОДА ${sign}${temp}°C   `;
         document.getElementById('weatherPreview').innerText = `${sign}${temp}°C`;
-        sendBleRaw(`TP:0,00f0ff,ff0080,ffe600,60,0,0,1,3\n`);
+        sendBleRaw(`TP:0,00f0ff,ff0080,ffe600,60,0,0,1,3,0\n`);
         sendBleRaw(`T:${str}\n`);
         showToast("Погода по GPS отправлена!");
       } catch(e) {
@@ -986,24 +1143,111 @@
     }
   }
 
-  // ЦВЕТОМУЗЫКА С МИКРОФОНА ТЕЛЕФОНА (WEB AUDIO FFT)
+  // ==========================================
+  // --- ЦВЕТОМУЗЫКА: 10 ПОЛОС С РАЗДЕЛЕНИЕМ В 1 ПИКСЕЛЬ ---
+  // ==========================================
   let audioCtx = null;
   let audioAnalyser = null;
   let audioStream = null;
   let micTimer = null;
   let micGain = 1.5;
+  let vuStyle = 0; // 0: Studio VU, 1: Neon, 2: Fire, 3: Ice, 4: Rainbow
+  let vuCurrentHeights = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
+  function setVuStyle(s) {
+    vuStyle = s;
+    for (let i = 0; i < 5; i++) {
+      const el = document.getElementById('vuStyle' + i);
+      if (el) el.classList.toggle('active', i === s);
+    }
+    updateVuUiPreview(vuCurrentHeights);
+  }
+
+  // Инициализация 10 колонок в UI по 5 сегментов в каждой
   const vuMeter = document.getElementById('vuMeter');
-  for (let i = 0; i < 20; i++) {
+  vuMeter.innerHTML = '';
+  for (let b = 0; b < 10; b++) {
     const col = document.createElement('div');
-    col.className = 'vu-col';
+    col.className = 'vu-col-10';
+    col.id = 'vuCol' + b;
+    for (let seg = 1; seg <= 5; seg++) {
+      const s = document.createElement('div');
+      s.className = 'vu-seg';
+      s.id = `vuSeg_${b}_${seg}`;
+      col.appendChild(s);
+    }
     vuMeter.appendChild(col);
+  }
+
+  // Цвета уровней для интерфейса UI
+  function getVuColor(style, barIdx, lvl) {
+    if (style === 0) { // Studio VU: Зеленый -> Лайм -> Желтый -> Оранжевый -> Красный
+      if (lvl === 1) return '#00ff1e';
+      if (lvl === 2) return '#a0ff00';
+      if (lvl === 3) return '#ffc800';
+      if (lvl === 4) return '#ff5000';
+      return '#ff0000';
+    } else if (style === 1) { // Cyberpunk Neon
+      if (lvl === 1) return '#0064ff';
+      if (lvl === 2) return '#00f0ff';
+      if (lvl === 3) return '#c800ff';
+      if (lvl === 4) return '#ff0096';
+      return '#ffffff';
+    } else if (style === 2) { // Fire
+      if (lvl === 1) return '#b40000';
+      if (lvl === 2) return '#ff2800';
+      if (lvl === 3) return '#ff7800';
+      if (lvl === 4) return '#ffd200';
+      return '#ffffdc';
+    } else if (style === 3) { // Ice
+      if (lvl === 1) return '#0028b4';
+      if (lvl === 2) return '#008cff';
+      if (lvl === 3) return '#00f0ff';
+      if (lvl === 4) return '#96ffff';
+      return '#ffffff';
+    } else { // Rainbow
+      const hue = barIdx * 25;
+      const lit = 45 + lvl * 10;
+      return `hsl(${hue}, 100%, ${lit}%)`;
+    }
+  }
+
+  function updateVuUiPreview(heights) {
+    for (let b = 0; b < 10; b++) {
+      const h = heights[b] || 0;
+      for (let lvl = 1; lvl <= 5; lvl++) {
+        const seg = document.getElementById(`vuSeg_${b}_${lvl}`);
+        if (!seg) continue;
+        if (lvl <= h) {
+          const col = getVuColor(vuStyle, b, lvl);
+          seg.style.background = col;
+          seg.style.boxShadow = `0 0 6px ${col}`;
+        } else {
+          seg.style.background = '#141c2e';
+          seg.style.boxShadow = 'none';
+        }
+      }
+    }
   }
 
   function updateMicGain(v) {
     micGain = v / 10;
     document.getElementById('micGainVal').innerText = micGain.toFixed(1) + 'x';
   }
+
+  // Распределение частот FFT по 10 полосам
+  const fftBands = [
+    [1, 2],    // 0: Sub-bass
+    [2, 3],    // 1: Bass
+    [3, 4],    // 2: Low-mid
+    [4, 6],    // 3: Mid 1
+    [6, 8],    // 4: Mid 2
+    [8, 11],   // 5: Mid-high
+    [11, 15],  // 6: Presence
+    [15, 20],  // 7: High
+    [20, 26],  // 8: Treble
+    [26, 32]   // 9: Brilliance
+  ];
 
   async function toggleMicStream() {
     if (micTimer) {
@@ -1018,46 +1262,52 @@
       const src = audioCtx.createMediaStreamSource(audioStream);
       audioAnalyser = audioCtx.createAnalyser();
       audioAnalyser.fftSize = 64;
+      audioAnalyser.smoothingTimeConstant = 0.5;
       src.connect(audioAnalyser);
 
       document.getElementById('micStreamBtn').innerText = "⏹ Выключить цветомузыку";
       document.getElementById('micStreamBtn').classList.add('danger');
-      showToast("Микрофон подключен! Играйте музыку");
+      showToast("Микрофон подключен! Играйте музыку 🎵");
 
       const bufferLength = audioAnalyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
+      let lastBleSend = 0;
 
-      let lastSend = 0;
       micTimer = setInterval(() => {
         audioAnalyser.getByteFrequencyData(dataArray);
 
-        // Масштабируем 20 полос
-        let colHeights = [];
-        for (let i = 0; i < 20; i++) {
-          let binIdx = Math.min(Math.floor((i / 20) * (bufferLength * 0.8)), bufferLength - 1);
-          let val = Math.min(5, Math.floor((dataArray[binIdx] / 255) * 5 * micGain));
-          colHeights.push(val);
-          vuMeter.children[i].style.height = (val * 20) + '%';
+        let newHeights = [];
+        for (let b = 0; b < 10; b++) {
+          const [startBin, endBin] = fftBands[b];
+          let sum = 0;
+          let count = 0;
+          for (let k = startBin; k < endBin && k < bufferLength; k++) {
+            sum += dataArray[k];
+            count++;
+          }
+          const avg = count > 0 ? (sum / count) : 0;
+          let targetH = Math.min(5, Math.floor((avg / 255) * 5.5 * micGain));
+
+          // Мгновенная атака и плавный спад (peak decay)
+          if (targetH > vuCurrentHeights[b]) {
+            vuCurrentHeights[b] = targetH;
+          } else if (vuCurrentHeights[b] > 0) {
+            vuCurrentHeights[b] = Math.max(0, vuCurrentHeights[b] - 1);
+          }
+          newHeights.push(vuCurrentHeights[b]);
         }
 
-        // Шлем RAW фрейм каждые 65 мс
+        // Обновляем визуализатор на экране телефона
+        updateVuUiPreview(newHeights);
+
+        // Отправляем ультра-компактный пакет (15 байт) на ESP32 каждые 45 мс
         const now = Date.now();
-        if (now - lastSend >= 65 && isConnected) {
-          lastSend = now;
-          let hexFrame = "";
-          const vuColors = ["000000", "00ff66", "00f0ff", "ffea00", "ff5500", "ff0055"];
-          for (let y = 0; y < 5; y++) {
-            for (let x = 0; x < 20; x++) {
-              let h = colHeights[x];
-              // снизу вверх: y=4 это низ, y=0 это верх
-              let rowFromBottom = 4 - y;
-              let col = (rowFromBottom < h) ? vuColors[rowFromBottom + 1] : "000000";
-              hexFrame += col;
-            }
-          }
-          sendBleRaw("RAW:" + hexFrame + "\n");
+        if (now - lastBleSend >= 45 && isConnected) {
+          lastBleSend = now;
+          const digits = newHeights.join('');
+          sendBleRaw(`VU:${vuStyle},${digits}\n`);
         }
-      }, 50);
+      }, 35);
 
     } catch (e) {
       console.error(e);
@@ -1076,7 +1326,8 @@
       audioCtx.close();
       audioCtx = null;
     }
-    for (let c of vuMeter.children) c.style.height = '4px';
+    vuCurrentHeights = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    updateVuUiPreview(vuCurrentHeights);
     document.getElementById('micStreamBtn').innerText = "🎙 Включить цветомузыку с микрофона";
     document.getElementById('micStreamBtn').classList.remove('danger');
     showToast("Цветомузыка выключена");
