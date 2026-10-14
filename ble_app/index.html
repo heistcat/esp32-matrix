@@ -145,6 +145,33 @@
 
   <!-- ТАБ 1: СМАРТ-ВИДЖЕТЫ (ТЕЛЕФОН -> МАТРИЦА) -->
   <div id="tabSmart" class="tab-content active">
+    <!-- КОМБИНИРОВАННЫЙ СМАРТ-ИНФОРМЕР (ВРЕМЯ + ПОГОДА + ВАЛЮТЫ) -->
+    <div class="card" style="border-color: rgba(0, 240, 255, 0.4); background: linear-gradient(180deg, #121c2e, #0e1524);">
+      <div class="card-title">
+        <span>🔀 Смарт-Информер (Комбинация данных)</span>
+        <span id="comboStatus" style="font-size:11px; color:var(--accent);">Готово</span>
+      </div>
+      <p style="font-size:12px; color:var(--text-dim);">Объединяет время, погоду и курсы валют в единый информационный режим.</p>
+      
+      <div class="card-title" style="margin-top:2px;">Включить в информер</div>
+      <div class="grid-3">
+        <div class="btn-select active" id="cbOptTime" onclick="toggleComboOpt('time')">🕒 Время</div>
+        <div class="btn-select active" id="cbOptWeather" onclick="toggleComboOpt('weather')">⛅ Погода</div>
+        <div class="btn-select active" id="cbOptRates" onclick="toggleComboOpt('rates')">💱 Валюты</div>
+      </div>
+
+      <div class="card-title" style="margin-top:2px;">Формат показа</div>
+      <div class="grid-2">
+        <div class="btn-select active" id="comboModeTicker" onclick="setComboDisplayMode('ticker')">➡️ Бегущая строка</div>
+        <div class="btn-select" id="comboModeSlides" onclick="setComboDisplayMode('slides')">🔄 Смена экранов</div>
+      </div>
+
+      <div class="grid-2" style="margin-top:4px;">
+        <button id="comboStreamBtn" onclick="toggleComboStream()">▶ Запустить Смарт-Информер</button>
+        <button class="sec" onclick="sendComboOnce()">Отправить 1 раз</button>
+      </div>
+    </div>
+
     <!-- ЧАСЫ СО СМАРТФОНА -->
     <div class="card">
       <div class="card-title">
@@ -185,21 +212,24 @@
       </div>
     </div>
 
-    <!-- КРИПТОВАЛЮТЫ И КУРСЫ -->
+    <!-- КУРСЫ ВАЛЮТ К УЗБЕКСКОМУ СУМУ (CBU УЗБЕКИСТАН) -->
     <div class="card">
       <div class="card-title">
-        <span>💰 Курсы криптовалют (Binance Live / CoinGecko)</span>
-        <span id="cryptoStatus" style="font-size:11px; color:var(--text-dim);">Готово</span>
+        <span>💱 Курсы валют к суму (CBU Узбекистан)</span>
+        <span id="ratesStatus" style="font-size:11px; color:var(--text-dim);">Готово</span>
       </div>
-      <div class="grid-4">
-        <div class="btn-select active" id="cCoinBtc" onclick="toggleCryptoCoin('BTC')">BTC</div>
-        <div class="btn-select active" id="cCoinEth" onclick="toggleCryptoCoin('ETH')">ETH</div>
-        <div class="btn-select active" id="cCoinTon" onclick="toggleCryptoCoin('TON')">TON</div>
-        <div class="btn-select" id="cCoinSol" onclick="toggleCryptoCoin('SOL')">SOL</div>
+      <p style="font-size:12px; color:var(--text-dim);">Официальные курсы валют Центрального Банка Узбекистана (к UZS).</p>
+      <div class="grid-3">
+        <div class="btn-select active" id="curUSD" onclick="toggleCurrency('USD')">$ USD (Доллар)</div>
+        <div class="btn-select active" id="curRUB" onclick="toggleCurrency('RUB')">₽ RUB (Рубль)</div>
+        <div class="btn-select active" id="curCNY" onclick="toggleCurrency('CNY')">¥ CNY (Юань)</div>
+        <div class="btn-select active" id="curEUR" onclick="toggleCurrency('EUR')">€ EUR (Евро)</div>
+        <div class="btn-select" id="curKZT" onclick="toggleCurrency('KZT')">₸ KZT (Тенге)</div>
+        <div class="btn-select" id="curTRY" onclick="toggleCurrency('TRY')">₺ TRY (Лира)</div>
       </div>
       <div class="grid-2">
-        <button id="cryptoStreamBtn" onclick="toggleCryptoStream()">▶ Транслировать курсы</button>
-        <button class="sec" onclick="fetchAndSendCryptoOnce()">Обновить и отправить</button>
+        <button id="ratesStreamBtn" onclick="toggleRatesStream()">▶ Транслировать курсы</button>
+        <button class="sec" onclick="fetchAndSendCurrenciesOnce()">Обновить и отправить</button>
       </div>
     </div>
 
@@ -983,91 +1013,234 @@
     }
   }
 
-  // КРИПТОВАЛЮТЫ (БЫСТРЫЙ BINANCE API + COINGECKO FALLBACK)
-  let activeCoins = { BTC: true, ETH: true, TON: true, SOL: false };
-  let cryptoTimer = null;
+  // ==========================================
+  // --- КОМБИНИРОВАННЫЙ СМАРТ-ИНФОРМЕР ---
+  // ==========================================
+  let comboOptions = { time: true, weather: true, rates: true };
+  let comboDisplayMode = 'ticker'; // 'ticker' (бегущая строка) или 'slides' (смена экранов)
+  let comboTimer = null;
+  let comboSlideIdx = 0;
 
-  function toggleCryptoCoin(c) {
-    activeCoins[c] = !activeCoins[c];
-    document.getElementById('cCoin' + c.charAt(0) + c.slice(1).toLowerCase()).classList.toggle('active', activeCoins[c]);
+  function toggleComboOpt(opt) {
+    comboOptions[opt] = !comboOptions[opt];
+    const el = document.getElementById('cbOpt' + opt.charAt(0).toUpperCase() + opt.slice(1));
+    if (el) el.classList.toggle('active', comboOptions[opt]);
   }
 
-  async function fetchCryptoString() {
-    document.getElementById('cryptoStatus').innerText = "Запрос курсов...";
-    let prices = {};
+  function setComboDisplayMode(mode) {
+    comboDisplayMode = mode;
+    document.getElementById('comboModeTicker').classList.toggle('active', mode === 'ticker');
+    document.getElementById('comboModeSlides').classList.toggle('active', mode === 'slides');
+    if (comboTimer) {
+      stopComboStream();
+      toggleComboStream();
+    }
+  }
 
-    // 1. Быстрый публичный Binance API (без CORS-ограничений и лимитов)
+  async function getComboTickerText() {
+    let sections = [];
+    if (comboOptions.time) {
+      sections.push(`🕒 ${getFormattedTime()}`);
+    }
+    if (comboOptions.weather) {
+      const city = document.getElementById('cityInput').value.trim() || "Tashkent";
+      const wStr = await fetchWeatherString(city);
+      if (wStr) {
+        sections.push(wStr.trim());
+      }
+    }
+    if (comboOptions.rates) {
+      const cStr = await formatCurrencyString();
+      if (cStr) {
+        sections.push(cStr.trim());
+      }
+    }
+    if (sections.length === 0) return null;
+    return sections.join('   *   ') + "   ";
+  }
+
+  async function sendComboOnce() {
+    const text = await getComboTickerText();
+    if (text) {
+      sendBleRaw(`TP:2,00f0ff,ff0080,ffe600,60,0,0,1,3,0\n`);
+      sendBleRaw(`T:${text}\n`);
+      showToast("Информер отправлен на матрицу!");
+    } else {
+      showToast("Выберите хотя бы один пункт для информера");
+    }
+  }
+
+  async function stepComboSlide() {
+    const activeSlides = [];
+    if (comboOptions.time) activeSlides.push('time');
+    if (comboOptions.weather) activeSlides.push('weather');
+    if (comboOptions.rates) activeSlides.push('rates');
+
+    if (activeSlides.length === 0) return;
+    const cur = activeSlides[comboSlideIdx % activeSlides.length];
+    comboSlideIdx++;
+
+    if (cur === 'time') {
+      sendClockOnce();
+    } else if (cur === 'weather') {
+      fetchAndSendWeather();
+    } else if (cur === 'rates') {
+      fetchAndSendCurrenciesOnce();
+    }
+  }
+
+  function toggleComboStream() {
+    if (comboTimer) {
+      stopComboStream();
+      return;
+    }
+    stopAllStreams();
+
+    if (comboDisplayMode === 'ticker') {
+      sendComboOnce();
+      // Обновление бегущей строки каждые 40 секунд
+      comboTimer = setInterval(sendComboOnce, 40000);
+    } else {
+      comboSlideIdx = 0;
+      stepComboSlide();
+      // Смена экранов-слайдов каждые 7 секунд
+      comboTimer = setInterval(stepComboSlide, 7000);
+    }
+
+    document.getElementById('comboStreamBtn').innerText = "⏹ Остановить Информер";
+    document.getElementById('comboStreamBtn').classList.add('danger');
+    document.getElementById('comboStatus').innerText = "Информер активен";
+    showToast("Смарт-Информер запущен!");
+  }
+
+  function stopComboStream() {
+    if (comboTimer) {
+      clearInterval(comboTimer);
+      comboTimer = null;
+    }
+    document.getElementById('comboStreamBtn').innerText = "▶ Запустить Смарт-Информер";
+    document.getElementById('comboStreamBtn').classList.remove('danger');
+    document.getElementById('comboStatus').innerText = "Остановлен";
+    showToast("Смарт-Информер остановлен");
+  }
+
+  // ==========================================
+  // --- КУРСЫ ВАЛЮТ К УЗБЕКСКОМУ СУМУ (UZS) ---
+  // ==========================================
+  let activeCurrencies = { USD: true, RUB: true, CNY: true, EUR: true, KZT: false, TRY: false };
+  let currencyTimer = null;
+  let cachedRates = null;
+  let lastRatesFetch = 0;
+
+  function toggleCurrency(c) {
+    activeCurrencies[c] = !activeCurrencies[c];
+    const el = document.getElementById('cur' + c);
+    if (el) el.classList.toggle('active', activeCurrencies[c]);
+  }
+
+  async function fetchUzbekRates() {
+    const now = Date.now();
+    if (cachedRates && (now - lastRatesFetch < 300000)) {
+      return cachedRates;
+    }
+
+    document.getElementById('ratesStatus').innerText = "Запрос ЦБ РУз...";
     try {
-      const symbols = [];
-      if (activeCoins.BTC) symbols.push('"BTCUSDT"');
-      if (activeCoins.ETH) symbols.push('"ETHUSDT"');
-      if (activeCoins.SOL) symbols.push('"SOLUSDT"');
-      if (activeCoins.TON) symbols.push('"TONUSDT"');
-
-      if (symbols.length > 0) {
-        const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=[${symbols.join(',')}]`);
-        if (res.ok) {
-          const data = await res.json();
-          for (const item of data) {
-            const sym = item.symbol.replace('USDT', '');
-            prices[sym] = parseFloat(item.price);
-          }
+      // 1. Официальный API Центрального Банка Узбекистана (cbu.uz)
+      const res = await fetch('https://cbu.uz/ru/arkhiv-kursov-valyut/json/');
+      if (res.ok) {
+        const data = await res.json();
+        let rates = {};
+        for (const item of data) {
+          rates[item.Ccy] = parseFloat(item.Rate);
         }
+        cachedRates = rates;
+        lastRatesFetch = now;
+        document.getElementById('ratesStatus').innerText = "Курсы ЦБ РУз получены";
+        return rates;
       }
     } catch (e) {
-      console.warn("Binance API error, fallback to CoinGecko", e);
+      console.warn("CBU API fetch failed, trying fallback...", e);
     }
 
-    // 2. Резервный CoinGecko (если Binance не ответил)
-    if (Object.keys(prices).length === 0) {
-      try {
-        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,the-open-network&vs_currencies=usd');
+    // 2. Резервный ExchangeRate API
+    try {
+      const res = await fetch('https://open.er-api.com/v6/latest/USD');
+      if (res.ok) {
         const data = await res.json();
-        if (data.bitcoin) prices['BTC'] = data.bitcoin.usd;
-        if (data.ethereum) prices['ETH'] = data.ethereum.usd;
-        if (data['the-open-network']) prices['TON'] = data['the-open-network'].usd;
-        if (data.solana) prices['SOL'] = data.solana.usd;
-      } catch(e) {
-        console.error("CoinGecko API error", e);
+        const uzsRate = data.rates['UZS'] || 11900;
+        let rates = {
+          USD: uzsRate,
+          EUR: uzsRate / (data.rates['EUR'] || 1.1),
+          RUB: uzsRate / (data.rates['RUB'] || 85),
+          CNY: uzsRate / (data.rates['CNY'] || 6.7),
+          KZT: uzsRate / (data.rates['KZT'] || 450),
+          TRY: uzsRate / (data.rates['TRY'] || 32)
+        };
+        cachedRates = rates;
+        lastRatesFetch = now;
+        document.getElementById('ratesStatus').innerText = "Курсы получены (Резерв)";
+        return rates;
       }
+    } catch (e) {
+      console.error("Currency fallback error", e);
     }
 
-    let parts = [];
-    if (activeCoins.BTC && prices.BTC) parts.push(`BTC $${Math.round(prices.BTC).toLocaleString()}`);
-    if (activeCoins.ETH && prices.ETH) parts.push(`ETH $${Math.round(prices.ETH).toLocaleString()}`);
-    if (activeCoins.TON && prices.TON) parts.push(`TON $${prices.TON.toFixed(2)}`);
-    if (activeCoins.SOL && prices.SOL) parts.push(`SOL $${prices.SOL.toFixed(1)}`);
-
-    if (parts.length > 0) {
-      document.getElementById('cryptoStatus').innerText = "Курсы получены: " + parts.join(' | ');
-      return parts.join('   ') + "   ";
-    } else {
-      document.getElementById('cryptoStatus').innerText = "Ошибка загрузки курсов";
-      return null;
-    }
+    document.getElementById('ratesStatus').innerText = "Ошибка загрузки курсов";
+    return cachedRates;
   }
 
-  async function fetchAndSendCryptoOnce() {
-    const str = await fetchCryptoString();
+  async function formatCurrencyString() {
+    const rates = await fetchUzbekRates();
+    if (!rates) return null;
+
+    let parts = [];
+    if (activeCurrencies.USD && rates.USD) {
+      parts.push(`$ ${Math.round(rates.USD).toLocaleString('ru-RU')}`);
+    }
+    if (activeCurrencies.RUB && rates.RUB) {
+      parts.push(`₽ ${rates.RUB.toFixed(1)}`);
+    }
+    if (activeCurrencies.CNY && rates.CNY) {
+      parts.push(`¥ ${Math.round(rates.CNY).toLocaleString('ru-RU')}`);
+    }
+    if (activeCurrencies.EUR && rates.EUR) {
+      parts.push(`€ ${Math.round(rates.EUR).toLocaleString('ru-RU')}`);
+    }
+    if (activeCurrencies.KZT && rates.KZT) {
+      parts.push(`100₸ ${Math.round(rates.KZT * 100).toLocaleString('ru-RU')}`);
+    }
+    if (activeCurrencies.TRY && rates.TRY) {
+      parts.push(`1₺ ${Math.round(rates.TRY).toLocaleString('ru-RU')}`);
+    }
+
+    if (parts.length > 0) {
+      return parts.join('   ') + "   ";
+    }
+    return null;
+  }
+
+  async function fetchAndSendCurrenciesOnce() {
+    const str = await formatCurrencyString();
     if (str) {
       sendBleRaw(`TP:2,00f0ff,ff0080,ffe600,60,0,1,1,4,0\n`);
       sendBleRaw(`T:${str}\n`);
-      showToast("Курсы отправлены на матрицу");
+      showToast("Курсы валют отправлены на матрицу");
     }
   }
 
-  function toggleCryptoStream() {
-    if (cryptoTimer) {
-      clearInterval(cryptoTimer);
-      cryptoTimer = null;
-      document.getElementById('cryptoStreamBtn').innerText = "▶ Транслировать курсы";
-      document.getElementById('cryptoStreamBtn').classList.remove('danger');
+  function toggleRatesStream() {
+    if (currencyTimer) {
+      clearInterval(currencyTimer);
+      currencyTimer = null;
+      document.getElementById('ratesStreamBtn').innerText = "▶ Транслировать курсы";
+      document.getElementById('ratesStreamBtn').classList.remove('danger');
     } else {
       stopAllStreams();
-      fetchAndSendCryptoOnce();
-      cryptoTimer = setInterval(fetchAndSendCryptoOnce, 60000); // каждую минуту
-      document.getElementById('cryptoStreamBtn').innerText = "⏹ Остановить курсы";
-      document.getElementById('cryptoStreamBtn').classList.add('danger');
+      fetchAndSendCurrenciesOnce();
+      currencyTimer = setInterval(fetchAndSendCurrenciesOnce, 60000); // каждую минуту
+      document.getElementById('ratesStreamBtn').innerText = "⏹ Остановить курсы";
+      document.getElementById('ratesStreamBtn').classList.add('danger');
       showToast("Автообновление курсов запущено!");
     }
   }
@@ -1335,16 +1508,22 @@
 
   function stopAllStreams() {
     if (clockStreamTimer) { clearInterval(clockStreamTimer); clockStreamTimer = null; }
-    if (cryptoTimer) { clearInterval(cryptoTimer); cryptoTimer = null; }
+    if (currencyTimer) { clearInterval(currencyTimer); currencyTimer = null; }
     if (weatherTimer) { clearInterval(weatherTimer); weatherTimer = null; }
+    if (comboTimer) stopComboStream();
     if (micTimer) stopMicStream();
     if (animStreamTimer) stopStreamCustomAnim();
-    document.getElementById('clockStreamBtn').innerText = "▶ Включить трансляцию часов";
-    document.getElementById('clockStreamBtn').classList.remove('danger');
-    document.getElementById('cryptoStreamBtn').innerText = "▶ Транслировать курсы";
-    document.getElementById('cryptoStreamBtn').classList.remove('danger');
-    document.getElementById('weatherStreamBtn').innerText = "▶ Транслировать погоду";
-    document.getElementById('weatherStreamBtn').classList.remove('danger');
+
+    const clkBtn = document.getElementById('clockStreamBtn');
+    if (clkBtn) { clkBtn.innerText = "▶ Включить трансляцию часов"; clkBtn.classList.remove('danger'); }
+    const curBtn = document.getElementById('ratesStreamBtn');
+    if (curBtn) { curBtn.innerText = "▶ Транслировать курсы"; curBtn.classList.remove('danger'); }
+    const wBtn = document.getElementById('weatherStreamBtn');
+    if (wBtn) { wBtn.innerText = "▶ Транслировать погоду"; wBtn.classList.remove('danger'); }
+    const cmbBtn = document.getElementById('comboStreamBtn');
+    if (cmbBtn) { cmbBtn.innerText = "▶ Запустить Смарт-Информер"; cmbBtn.classList.remove('danger'); }
+    const cmbStat = document.getElementById('comboStatus');
+    if (cmbStat) cmbStat.innerText = "Остановлен";
   }
 
   // ==========================================
@@ -1374,6 +1553,7 @@
   }
 
   function applyTextBle() {
+    stopAllStreams();
     let txt = document.getElementById('textInput').value.trim();
     if (!txt) txt = " ";
     sendBleRaw(`TP:${textState.mode},${getColorHex('tc1')},${getColorHex('tc2')},${getColorHex('tc3')},${textState.speed},${currentStyle},${currentBg},${seamlessLoop ? 1 : 0},${loopGap},${currentFont}\n`);
@@ -1932,6 +2112,7 @@
   let effectSpeedMs = 55;
 
   function startEffectBle(id) {
+    stopAllStreams();
     document.querySelectorAll('.effect-card').forEach((c, i) => {
       c.classList.toggle('active', i === id);
     });
