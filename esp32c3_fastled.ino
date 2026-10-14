@@ -35,6 +35,7 @@ CRGB color2 = CRGB(255, 0, 128);// Pink
 CRGB color3 = CRGB(255, 230, 0);// Yellow neon
 uint8_t textStyle = 0;          // 0:Скролл, 1:Машинка, 2:Волна Y, 3:Дыхание, 4:Глитч, 5:Статичный
 uint8_t textBgMode = 0;         // 0:Черный, 1:Звезды, 2:Огонь, 3:Плазма
+uint8_t textFont = 0;           // 0:Стандарт (5x4), 1:Узкий (5x3), 2:Широкий Bold, 3:7-Сегмент, 4:Ретро 3x3
 bool textRunning = true;
 bool seamlessLoop = true;        // бесшовное зацикливание без пустого экрана
 uint8_t loopGap = 3;             // отступ между повторами в пикселях (0 = встык)
@@ -84,8 +85,8 @@ uint16_t XY(uint8_t x, uint8_t y) {
   return (panel * 25) + localIndex;
 }
 
-// --- 5-пиксельный растровый шрифт (ASCII + Кириллица UTF-8 + 50+ Эмодзи) ---
-uint8_t getGlyphCols(uint32_t u, uint8_t* out) {
+// --- НОРМАЛИЗАЦИЯ СИМВОЛОВ И КИРИЛЛИЦЫ ---
+uint32_t normalizeUnicode(uint32_t u) {
   if (u >= 'a' && u <= 'z') u -= 32;
   if (u >= 0x0430 && u <= 0x044F) u -= 0x20;
   if (u == 0x0401 || u == 0x0451) u = 0x0415; // Ё -> Е
@@ -103,7 +104,13 @@ uint8_t getGlyphCols(uint32_t u, uint8_t* out) {
   else if (u == 0x0422) u = 'T';
   else if (u == 0x0423) u = 'Y';
   else if (u == 0x0425) u = 'X';
+  return u;
+}
 
+// -------------------------------------------------------------
+// ШРИФТ 0: СТАНДАРТНЫЙ (Сбалансированный 5x4 / 5x5)
+// -------------------------------------------------------------
+uint8_t getGlyphColsStandard(uint32_t u, uint8_t* out) {
   switch (u) {
     // --- Латиница ---
     case 'A': out[0]=0x1E; out[1]=0x05; out[2]=0x05; out[3]=0x1E; return 4;
@@ -137,10 +144,10 @@ uint8_t getGlyphCols(uint32_t u, uint8_t* out) {
     case 0x0411: out[0]=0x1F; out[1]=0x15; out[2]=0x15; out[3]=0x0D; return 4; // Б
     case 0x0413: out[0]=0x1F; out[1]=0x01; out[2]=0x01; out[3]=0x01; return 4; // Г
     case 0x0414: out[0]=0x18; out[1]=0x0F; out[2]=0x09; out[3]=0x0F; out[4]=0x18; return 5; // Д
-    case 0x0416: out[0]=0x11; out[1]=0x0A; out[2]=0x1F; out[3]=0x0A; out[4]=0x11; return 5; // Ж (Х с палкой по центру)
+    case 0x0416: out[0]=0x11; out[1]=0x0A; out[2]=0x1F; out[3]=0x0A; out[4]=0x11; return 5; // Ж
     case 0x0417: out[0]=0x11; out[1]=0x15; out[2]=0x15; out[3]=0x0A; return 4; // З
-    case 0x0418: out[0]=0x1F; out[1]=0x08; out[2]=0x04; out[3]=0x02; out[4]=0x1F; return 5; // И (четкая 5x5 диагональ)
-    case 0x0419: out[0]=0x1E; out[1]=0x08; out[2]=0x05; out[3]=0x02; out[4]=0x1E; return 5; // Й (5x5 с диакритикой)
+    case 0x0418: out[0]=0x1F; out[1]=0x08; out[2]=0x04; out[3]=0x02; out[4]=0x1F; return 5; // И
+    case 0x0419: out[0]=0x1E; out[1]=0x08; out[2]=0x05; out[3]=0x02; out[4]=0x1E; return 5; // Й
     case 0x041B: out[0]=0x0F; out[1]=0x01; out[2]=0x01; out[3]=0x1F; return 4; // Л
     case 0x041F: out[0]=0x1F; out[1]=0x01; out[2]=0x01; out[3]=0x1F; return 4; // П
     case 0x0424: out[0]=0x04; out[1]=0x0E; out[2]=0x1F; out[3]=0x0E; out[4]=0x04; return 5; // Ф
@@ -183,13 +190,13 @@ uint8_t getGlyphCols(uint32_t u, uint8_t* out) {
     case '~': out[0]=0x02; out[1]=0x01; out[2]=0x02; out[3]=0x01; return 4;
     case '^': out[0]=0x02; out[1]=0x01; out[2]=0x02; return 3;
     case '*': out[0]=0x0A; out[1]=0x04; out[2]=0x0A; return 3;
-    case '/': out[0]=0x10; out[1]=0x08; out[2]=0x04; out[3]=0x02; out[4]=0x01; return 5; // Прямая 5x5 диагональ
-    case '\\': out[0]=0x01; out[1]=0x02; out[2]=0x04; out[3]=0x08; out[4]=0x10; return 5; // Прямой обратный слэш
-    case '$': out[0]=0x16; out[1]=0x15; out[2]=0x1F; out[3]=0x15; out[4]=0x0D; return 5; // $ (широкая S с прямой палкой)
-    case '%': out[0]=0x13; out[1]=0x08; out[2]=0x04; out[3]=0x02; out[4]=0x19; return 5; // Процент
-    case '@': out[0]=0x0E; out[1]=0x11; out[2]=0x17; out[3]=0x15; out[4]=0x0E; return 5; // @
-    case '#': out[0]=0x0A; out[1]=0x1F; out[2]=0x0A; out[3]=0x1F; out[4]=0x0A; return 5; // #
-    case '&': out[0]=0x0A; out[1]=0x15; out[2]=0x15; out[3]=0x0E; out[4]=0x10; return 5; // &
+    case '/': out[0]=0x10; out[1]=0x08; out[2]=0x04; out[3]=0x02; out[4]=0x01; return 5;
+    case '\\': out[0]=0x01; out[1]=0x02; out[2]=0x04; out[3]=0x08; out[4]=0x10; return 5;
+    case '$': out[0]=0x16; out[1]=0x15; out[2]=0x1F; out[3]=0x15; out[4]=0x0D; return 5;
+    case '%': out[0]=0x13; out[1]=0x08; out[2]=0x04; out[3]=0x02; out[4]=0x19; return 5;
+    case '@': out[0]=0x0E; out[1]=0x11; out[2]=0x17; out[3]=0x15; out[4]=0x0E; return 5;
+    case '#': out[0]=0x0A; out[1]=0x1F; out[2]=0x0A; out[3]=0x1F; out[4]=0x0A; return 5;
+    case '&': out[0]=0x0A; out[1]=0x15; out[2]=0x15; out[3]=0x0E; out[4]=0x10; return 5;
     case '(': out[0]=0x0E; out[1]=0x11; return 2;
     case ')': out[0]=0x11; out[1]=0x0E; return 2;
     case '[': out[0]=0x1F; out[1]=0x11; return 2;
@@ -200,15 +207,15 @@ uint8_t getGlyphCols(uint32_t u, uint8_t* out) {
     case '>': out[0]=0x11; out[1]=0x0A; out[2]=0x04; return 3;
 
     // --- СТРЕЛКИ И УКАЗАТЕЛИ (5x5) ---
-    case 0x2190: // ← Влево
+    case 0x2190: // ←
       out[0]=0x04; out[1]=0x0E; out[2]=0x15; out[3]=0x04; out[4]=0x04; return 5;
-    case 0x2192: // → Вправо
+    case 0x2192: // →
       out[0]=0x04; out[1]=0x04; out[2]=0x15; out[3]=0x0E; out[4]=0x04; return 5;
-    case 0x2191: // ↑ Вверх
+    case 0x2191: // ↑
       out[0]=0x04; out[1]=0x02; out[2]=0x1F; out[3]=0x02; out[4]=0x04; return 5;
-    case 0x2193: // ↓ Вниз
+    case 0x2193: // ↓
       out[0]=0x04; out[1]=0x08; out[2]=0x1F; out[3]=0x08; out[4]=0x04; return 5;
-    case 0x2194: // ↔ Двусторонняя стрелка
+    case 0x2194: // ↔
       out[0]=0x0E; out[1]=0x15; out[2]=0x04; out[3]=0x15; out[4]=0x0E; return 5;
     case 0x00AB: // «
       out[0]=0x04; out[1]=0x0A; out[2]=0x04; out[3]=0x0A; return 4;
@@ -229,6 +236,266 @@ uint8_t getGlyphCols(uint32_t u, uint8_t* out) {
 
     default: out[0]=0x00; return 1;
   }
+}
+
+// -------------------------------------------------------------
+// ШРИФТ 1: УЗКИЙ / КОМПАКТНЫЙ (5x3)
+// -------------------------------------------------------------
+uint8_t getGlyphColsNarrow(uint32_t u, uint8_t* out) {
+  switch (u) {
+    case 'A': out[0]=0x1E; out[1]=0x05; out[2]=0x1E; return 3;
+    case 'B': out[0]=0x1F; out[1]=0x15; out[2]=0x0A; return 3;
+    case 'C': out[0]=0x0E; out[1]=0x11; out[2]=0x11; return 3;
+    case 'D': out[0]=0x1F; out[1]=0x11; out[2]=0x0E; return 3;
+    case 'E': out[0]=0x1F; out[1]=0x15; out[2]=0x11; return 3;
+    case 'F': out[0]=0x1F; out[1]=0x05; out[2]=0x01; return 3;
+    case 'G': out[0]=0x0E; out[1]=0x11; out[2]=0x1D; return 3;
+    case 'H': out[0]=0x1F; out[1]=0x04; out[2]=0x1F; return 3;
+    case 'I': out[0]=0x11; out[1]=0x1F; out[2]=0x11; return 3;
+    case 'J': out[0]=0x08; out[1]=0x10; out[2]=0x0F; return 3;
+    case 'K': out[0]=0x1F; out[1]=0x04; out[2]=0x1B; return 3;
+    case 'L': out[0]=0x1F; out[1]=0x10; out[2]=0x10; return 3;
+    case 'M': out[0]=0x1F; out[1]=0x02; out[2]=0x1F; return 3;
+    case 'N': out[0]=0x1F; out[1]=0x06; out[2]=0x1F; return 3;
+    case 'O': out[0]=0x0E; out[1]=0x11; out[2]=0x0E; return 3;
+    case 'P': out[0]=0x1F; out[1]=0x05; out[2]=0x02; return 3;
+    case 'Q': out[0]=0x0E; out[1]=0x11; out[2]=0x1E; return 3;
+    case 'R': out[0]=0x1F; out[1]=0x05; out[2]=0x1A; return 3;
+    case 'S': out[0]=0x12; out[1]=0x15; out[2]=0x09; return 3;
+    case 'T': out[0]=0x01; out[1]=0x1F; out[2]=0x01; return 3;
+    case 'U': out[0]=0x0F; out[1]=0x10; out[2]=0x0F; return 3;
+    case 'V': out[0]=0x07; out[1]=0x18; out[2]=0x07; return 3;
+    case 'W': out[0]=0x1F; out[1]=0x08; out[2]=0x1F; return 3;
+    case 'X': out[0]=0x1B; out[1]=0x04; out[2]=0x1B; return 3;
+    case 'Y': out[0]=0x03; out[1]=0x1C; out[2]=0x03; return 3;
+    case 'Z': out[0]=0x19; out[1]=0x15; out[2]=0x13; return 3;
+
+    case 0x0411: out[0]=0x1F; out[1]=0x15; out[2]=0x0D; return 3; // Б
+    case 0x0413: out[0]=0x1F; out[1]=0x01; out[2]=0x01; return 3; // Г
+    case 0x0414: out[0]=0x18; out[1]=0x0F; out[2]=0x0F; out[3]=0x18; return 4; // Д
+    case 0x0416: out[0]=0x15; out[1]=0x1F; out[2]=0x15; return 3; // Ж
+    case 0x0417: out[0]=0x11; out[1]=0x15; out[2]=0x0A; return 3; // З
+    case 0x0418: out[0]=0x1F; out[1]=0x08; out[2]=0x02; out[3]=0x1F; return 4; // И
+    case 0x0419: out[0]=0x1E; out[1]=0x09; out[2]=0x02; out[3]=0x1E; return 4; // Й
+    case 0x041B: out[0]=0x0F; out[1]=0x01; out[2]=0x1F; return 3; // Л
+    case 0x041F: out[0]=0x1F; out[1]=0x01; out[2]=0x1F; return 3; // П
+    case 0x0424: out[0]=0x0E; out[1]=0x1F; out[2]=0x0E; return 3; // Ф
+    case 0x0426: out[0]=0x0F; out[1]=0x08; out[2]=0x1F; out[3]=0x18; return 4; // Ц
+    case 0x0427: out[0]=0x07; out[1]=0x04; out[2]=0x1F; return 3; // Ч
+    case 0x0428: out[0]=0x1F; out[1]=0x10; out[2]=0x1F; return 3; // Ш
+    case 0x0429: out[0]=0x1F; out[1]=0x10; out[2]=0x1F; out[3]=0x18; return 4; // Щ
+    case 0x042A: out[0]=0x01; out[1]=0x1F; out[2]=0x14; out[3]=0x08; return 4; // Ъ
+    case 0x042B: out[0]=0x1F; out[1]=0x14; out[2]=0x08; out[3]=0x1F; return 4; // Ы
+    case 0x042C: out[0]=0x1F; out[1]=0x14; out[2]=0x08; return 3; // Ь
+    case 0x042D: out[0]=0x11; out[1]=0x15; out[2]=0x0E; return 3; // Э
+    case 0x042E: out[0]=0x1F; out[1]=0x04; out[2]=0x0E; out[3]=0x11; out[4]=0x0E; return 5; // Ю
+    case 0x042F: out[0]=0x16; out[1]=0x09; out[2]=0x1F; return 3; // Я
+
+    case '0': out[0]=0x0E; out[1]=0x11; out[2]=0x0E; return 3;
+    case '1': out[0]=0x02; out[1]=0x1F; out[2]=0x00; return 3;
+    case '2': out[0]=0x19; out[1]=0x15; out[2]=0x12; return 3;
+    case '3': out[0]=0x11; out[1]=0x15; out[2]=0x1F; return 3;
+    case '4': out[0]=0x07; out[1]=0x04; out[2]=0x1F; return 3;
+    case '5': out[0]=0x17; out[1]=0x15; out[2]=0x1D; return 3;
+    case '6': out[0]=0x1F; out[1]=0x15; out[2]=0x1D; return 3;
+    case '7': out[0]=0x01; out[1]=0x19; out[2]=0x07; return 3;
+    case '8': out[0]=0x1F; out[1]=0x15; out[2]=0x1F; return 3;
+    case '9': out[0]=0x17; out[1]=0x15; out[2]=0x1F; return 3;
+
+    case ' ': out[0]=0x00; return 1;
+    case '!': out[0]=0x17; return 1;
+    case '?': out[0]=0x01; out[1]=0x15; out[2]=0x03; return 3;
+    case '.': out[0]=0x10; return 1;
+    case ',': out[0]=0x18; return 1;
+    case ':': out[0]=0x0A; return 1;
+    case ';': out[0]=0x1A; return 1;
+    case '-': out[0]=0x04; out[1]=0x04; return 2;
+    case '+': out[0]=0x04; out[1]=0x0E; out[2]=0x04; return 3;
+    case '=': out[0]=0x0A; out[1]=0x0A; return 2;
+
+    default: return 0; // Fallback
+  }
+}
+
+// -------------------------------------------------------------
+// ШРИФТ 2: ШИРОКИЙ / BOLD (5x5 / 5x6)
+// -------------------------------------------------------------
+uint8_t getGlyphColsWide(uint32_t u, uint8_t* out) {
+  switch (u) {
+    case 'A': out[0]=0x1E; out[1]=0x1F; out[2]=0x05; out[3]=0x1F; out[4]=0x1E; return 5;
+    case 'B': out[0]=0x1F; out[1]=0x1F; out[2]=0x15; out[3]=0x15; out[4]=0x0E; return 5;
+    case 'C': out[0]=0x0E; out[1]=0x1F; out[2]=0x11; out[3]=0x11; out[4]=0x11; return 5;
+    case 'D': out[0]=0x1F; out[1]=0x1F; out[2]=0x11; out[3]=0x1F; out[4]=0x0E; return 5;
+    case 'E': out[0]=0x1F; out[1]=0x1F; out[2]=0x15; out[3]=0x15; out[4]=0x11; return 5;
+    case 'F': out[0]=0x1F; out[1]=0x1F; out[2]=0x05; out[3]=0x05; out[4]=0x01; return 5;
+    case 'G': out[0]=0x0E; out[1]=0x1F; out[2]=0x11; out[3]=0x15; out[4]=0x1D; return 5;
+    case 'H': out[0]=0x1F; out[1]=0x1F; out[2]=0x04; out[3]=0x1F; out[4]=0x1F; return 5;
+    case 'I': out[0]=0x11; out[1]=0x1F; out[2]=0x1F; out[3]=0x11; return 4;
+    case 'J': out[0]=0x0C; out[1]=0x10; out[2]=0x10; out[3]=0x1F; out[4]=0x1F; return 5;
+    case 'K': out[0]=0x1F; out[1]=0x1F; out[2]=0x04; out[3]=0x0E; out[4]=0x1B; return 5;
+    case 'L': out[0]=0x1F; out[1]=0x1F; out[2]=0x10; out[3]=0x10; out[4]=0x10; return 5;
+    case 'M': out[0]=0x1F; out[1]=0x1F; out[2]=0x06; out[3]=0x06; out[4]=0x1F; out[5]=0x1F; return 6;
+    case 'N': out[0]=0x1F; out[1]=0x1F; out[2]=0x03; out[3]=0x0C; out[4]=0x1F; out[5]=0x1F; return 6;
+    case 'O': out[0]=0x0E; out[1]=0x1F; out[2]=0x11; out[3]=0x1F; out[4]=0x0E; return 5;
+    case 'P': out[0]=0x1F; out[1]=0x1F; out[2]=0x05; out[3]=0x07; out[4]=0x02; return 5;
+    case 'Q': out[0]=0x0E; out[1]=0x1F; out[2]=0x11; out[3]=0x1F; out[4]=0x1E; return 5;
+    case 'R': out[0]=0x1F; out[1]=0x1F; out[2]=0x05; out[3]=0x0F; out[4]=0x16; return 5;
+    case 'S': out[0]=0x12; out[1]=0x17; out[2]=0x15; out[3]=0x1D; out[4]=0x09; return 5;
+    case 'T': out[0]=0x01; out[1]=0x01; out[2]=0x1F; out[3]=0x1F; out[4]=0x01; out[5]=0x01; return 6;
+    case 'U': out[0]=0x0F; out[1]=0x1F; out[2]=0x10; out[3]=0x1F; out[4]=0x0F; return 5;
+    case 'V': out[0]=0x07; out[1]=0x1E; out[2]=0x18; out[3]=0x1E; out[4]=0x07; return 5;
+    case 'W': out[0]=0x1F; out[1]=0x1F; out[2]=0x0C; out[3]=0x0C; out[4]=0x1F; out[5]=0x1F; return 6;
+    case 'X': out[0]=0x1B; out[1]=0x1F; out[2]=0x0E; out[3]=0x1F; out[4]=0x1B; return 5;
+    case 'Y': out[0]=0x03; out[1]=0x07; out[2]=0x1C; out[3]=0x07; out[4]=0x03; return 5;
+    case 'Z': out[0]=0x19; out[1]=0x1D; out[2]=0x17; out[3]=0x13; out[4]=0x11; return 5;
+
+    case 0x0411: out[0]=0x1F; out[1]=0x1F; out[2]=0x15; out[3]=0x15; out[4]=0x0D; return 5; // Б
+    case 0x0413: out[0]=0x1F; out[1]=0x1F; out[2]=0x01; out[3]=0x01; out[4]=0x01; return 5; // Г
+    case 0x0414: out[0]=0x18; out[1]=0x1F; out[2]=0x09; out[3]=0x09; out[4]=0x1F; out[5]=0x18; return 6; // Д
+    case 0x0416: out[0]=0x11; out[1]=0x1B; out[2]=0x1F; out[3]=0x1F; out[4]=0x1B; out[5]=0x11; return 6; // Ж
+    case 0x0417: out[0]=0x11; out[1]=0x15; out[2]=0x15; out[3]=0x1F; out[4]=0x0E; return 5; // З
+    case 0x0418: out[0]=0x1F; out[1]=0x1F; out[2]=0x08; out[3]=0x04; out[4]=0x1F; out[5]=0x1F; return 6; // И
+    case 0x0419: out[0]=0x1E; out[1]=0x1F; out[2]=0x09; out[3]=0x05; out[4]=0x1F; out[5]=0x1E; return 6; // Й
+    case 0x041B: out[0]=0x0F; out[1]=0x1F; out[2]=0x01; out[3]=0x1F; out[4]=0x1F; return 5; // Л
+    case 0x041F: out[0]=0x1F; out[1]=0x1F; out[2]=0x01; out[3]=0x1F; out[4]=0x1F; return 5; // П
+    case 0x0424: out[0]=0x04; out[1]=0x0E; out[2]=0x1F; out[3]=0x1F; out[4]=0x0E; out[5]=0x04; return 6; // Ф
+    case 0x0426: out[0]=0x0F; out[1]=0x1F; out[2]=0x08; out[3]=0x1F; out[4]=0x1F; out[5]=0x18; return 6; // Ц
+    case 0x0427: out[0]=0x07; out[1]=0x07; out[2]=0x04; out[3]=0x1F; out[4]=0x1F; return 5; // Ч
+    case 0x0428: out[0]=0x1F; out[1]=0x1F; out[2]=0x10; out[3]=0x1F; out[4]=0x1F; out[5]=0x1F; return 6; // Ш
+    case 0x0429: out[0]=0x1F; out[1]=0x1F; out[2]=0x10; out[3]=0x1F; out[4]=0x1F; out[5]=0x18; return 6; // Щ
+    case 0x042A: out[0]=0x01; out[1]=0x1F; out[2]=0x1F; out[3]=0x14; out[4]=0x0E; return 5; // Ъ
+    case 0x042B: out[0]=0x1F; out[1]=0x1F; out[2]=0x14; out[3]=0x0E; out[4]=0x1F; out[5]=0x1F; return 6; // Ы
+    case 0x042C: out[0]=0x1F; out[1]=0x1F; out[2]=0x14; out[3]=0x14; out[4]=0x0E; return 5; // Ь
+    case 0x042D: out[0]=0x11; out[1]=0x15; out[2]=0x15; out[3]=0x1F; out[4]=0x0E; return 5; // Э
+    case 0x042E: out[0]=0x1F; out[1]=0x1F; out[2]=0x04; out[3]=0x0E; out[4]=0x11; out[5]=0x0E; return 6; // Ю
+    case 0x042F: out[0]=0x16; out[1]=0x1F; out[2]=0x0D; out[3]=0x1F; out[4]=0x1F; return 5; // Я
+
+    case '0': out[0]=0x0E; out[1]=0x1F; out[2]=0x11; out[3]=0x1F; out[4]=0x0E; return 5;
+    case '1': out[0]=0x04; out[1]=0x0E; out[2]=0x1F; out[3]=0x1F; out[4]=0x00; return 5;
+    case '2': out[0]=0x19; out[1]=0x1D; out[2]=0x15; out[3]=0x17; out[4]=0x13; return 5;
+    case '3': out[0]=0x11; out[1]=0x15; out[2]=0x15; out[3]=0x1F; out[4]=0x0E; return 5;
+    case '4': out[0]=0x07; out[1]=0x07; out[2]=0x04; out[3]=0x1F; out[4]=0x1F; return 5;
+    case '5': out[0]=0x17; out[1]=0x17; out[2]=0x15; out[3]=0x1D; out[4]=0x1D; return 5;
+    case '6': out[0]=0x0E; out[1]=0x1F; out[2]=0x15; out[3]=0x1D; out[4]=0x1C; return 5;
+    case '7': out[0]=0x01; out[1]=0x01; out[2]=0x19; out[3]=0x0F; out[4]=0x03; return 5;
+    case '8': out[0]=0x0E; out[1]=0x1F; out[2]=0x15; out[3]=0x1F; out[4]=0x0E; return 5;
+    case '9': out[0]=0x07; out[1]=0x17; out[2]=0x15; out[3]=0x1F; out[4]=0x0E; return 5;
+
+    case ' ': out[0]=0x00; out[1]=0x00; out[2]=0x00; return 3;
+    case '!': out[0]=0x17; out[1]=0x17; return 2;
+    case '?': out[0]=0x01; out[1]=0x1D; out[2]=0x15; out[3]=0x07; return 4;
+    case '-': out[0]=0x04; out[1]=0x04; out[2]=0x04; out[3]=0x04; return 4;
+    case '+': out[0]=0x04; out[1]=0x04; out[2]=0x1F; out[3]=0x04; out[4]=0x04; return 5;
+
+    default: return 0; // Fallback
+  }
+}
+
+// -------------------------------------------------------------
+// ШРИФТ 3: ЦИФРОВОЙ / 7-СЕГМЕНТНЫЙ (5x4)
+// -------------------------------------------------------------
+uint8_t getGlyphColsDigital(uint32_t u, uint8_t* out) {
+  switch (u) {
+    case '0': out[0]=0x1F; out[1]=0x11; out[2]=0x11; out[3]=0x1F; return 4;
+    case '1': out[0]=0x00; out[1]=0x00; out[2]=0x1F; out[3]=0x00; return 4;
+    case '2': out[0]=0x1D; out[1]=0x15; out[2]=0x15; out[3]=0x17; return 4;
+    case '3': out[0]=0x11; out[1]=0x15; out[2]=0x15; out[3]=0x1F; return 4;
+    case '4': out[0]=0x07; out[1]=0x04; out[2]=0x04; out[3]=0x1F; return 4;
+    case '5': out[0]=0x17; out[1]=0x15; out[2]=0x15; out[3]=0x1D; return 4;
+    case '6': out[0]=0x1F; out[1]=0x15; out[2]=0x15; out[3]=0x1D; return 4;
+    case '7': out[0]=0x01; out[1]=0x01; out[2]=0x01; out[3]=0x1F; return 4;
+    case '8': out[0]=0x1F; out[1]=0x15; out[2]=0x15; out[3]=0x1F; return 4;
+    case '9': out[0]=0x17; out[1]=0x15; out[2]=0x15; out[3]=0x1F; return 4;
+
+    case 'A': out[0]=0x1F; out[1]=0x05; out[2]=0x05; out[3]=0x1F; return 4;
+    case 'B': out[0]=0x1F; out[1]=0x14; out[2]=0x14; out[3]=0x1C; return 4;
+    case 'C': out[0]=0x1F; out[1]=0x11; out[2]=0x11; out[3]=0x11; return 4;
+    case 'D': out[0]=0x1C; out[1]=0x14; out[2]=0x14; out[3]=0x1F; return 4;
+    case 'E': out[0]=0x1F; out[1]=0x15; out[2]=0x15; out[3]=0x15; return 4;
+    case 'F': out[0]=0x1F; out[1]=0x05; out[2]=0x05; out[3]=0x01; return 4;
+    case 'H': out[0]=0x1F; out[1]=0x04; out[2]=0x04; out[3]=0x1F; return 4;
+    case 'L': out[0]=0x1F; out[1]=0x10; out[2]=0x10; out[3]=0x10; return 4;
+    case 'O': out[0]=0x1F; out[1]=0x11; out[2]=0x11; out[3]=0x1F; return 4;
+    case 'P': out[0]=0x1F; out[1]=0x05; out[2]=0x05; out[3]=0x07; return 4;
+    case 'U': out[0]=0x1F; out[1]=0x10; out[2]=0x10; out[3]=0x1F; return 4;
+
+    case ':': out[0]=0x0A; return 1;
+    case '.': out[0]=0x10; return 1;
+    case '-': out[0]=0x04; out[1]=0x04; out[2]=0x04; return 3;
+
+    default: return 0; // Fallback
+  }
+}
+
+// -------------------------------------------------------------
+// ШРИФТ 4: РЕТРО / ARCADE TINY (3x3 по центру)
+// -------------------------------------------------------------
+uint8_t getGlyphColsTiny(uint32_t u, uint8_t* out) {
+  switch (u) {
+    case 'A': out[0]=0x0C; out[1]=0x06; out[2]=0x0C; return 3;
+    case 'B': out[0]=0x0E; out[1]=0x0A; out[2]=0x04; return 3;
+    case 'C': out[0]=0x0E; out[1]=0x0A; out[2]=0x0A; return 3;
+    case 'D': out[0]=0x0E; out[1]=0x0A; out[2]=0x04; return 3;
+    case 'E': out[0]=0x0E; out[1]=0x0E; out[2]=0x0A; return 3;
+    case 'F': out[0]=0x0E; out[1]=0x06; out[2]=0x02; return 3;
+    case 'G': out[0]=0x0E; out[1]=0x0A; out[2]=0x0E; return 3;
+    case 'H': out[0]=0x0E; out[1]=0x04; out[2]=0x0E; return 3;
+    case 'I': out[0]=0x0E; return 1;
+    case 'J': out[0]=0x08; out[1]=0x08; out[2]=0x06; return 3;
+    case 'K': out[0]=0x0E; out[1]=0x04; out[2]=0x0A; return 3;
+    case 'L': out[0]=0x0E; out[1]=0x08; out[2]=0x08; return 3;
+    case 'M': out[0]=0x0E; out[1]=0x02; out[2]=0x0E; return 3;
+    case 'N': out[0]=0x0E; out[1]=0x06; out[2]=0x0E; return 3;
+    case 'O': out[0]=0x0E; out[1]=0x0A; out[2]=0x0E; return 3;
+    case 'P': out[0]=0x0E; out[1]=0x06; out[2]=0x06; return 3;
+    case 'Q': out[0]=0x0E; out[1]=0x0A; out[2]=0x0C; return 3;
+    case 'R': out[0]=0x0E; out[1]=0x06; out[2]=0x08; return 3;
+    case 'S': out[0]=0x06; out[1]=0x0E; out[2]=0x0A; return 3;
+    case 'T': out[0]=0x02; out[1]=0x0E; out[2]=0x02; return 3;
+    case 'U': out[0]=0x0E; out[1]=0x08; out[2]=0x0E; return 3;
+    case 'V': out[0]=0x06; out[1]=0x08; out[2]=0x06; return 3;
+    case 'W': out[0]=0x0E; out[1]=0x08; out[2]=0x0E; return 3;
+    case 'X': out[0]=0x0A; out[1]=0x04; out[2]=0x0A; return 3;
+    case 'Y': out[0]=0x06; out[1]=0x0C; out[2]=0x06; return 3;
+    case 'Z': out[0]=0x0A; out[1]=0x0E; out[2]=0x0A; return 3;
+
+    case '0': out[0]=0x0E; out[1]=0x0A; out[2]=0x0E; return 3;
+    case '1': out[0]=0x04; out[1]=0x0E; return 2;
+    case '2': out[0]=0x0A; out[1]=0x0E; out[2]=0x06; return 3;
+    case '3': out[0]=0x0A; out[1]=0x0A; out[2]=0x0E; return 3;
+    case '4': out[0]=0x06; out[1]=0x04; out[2]=0x0E; return 3;
+    case '5': out[0]=0x0E; out[1]=0x0E; out[2]=0x0A; return 3;
+    case '6': out[0]=0x0E; out[1]=0x0E; out[2]=0x0E; return 3;
+    case '7': out[0]=0x02; out[1]=0x02; out[2]=0x0E; return 3;
+    case '8': out[0]=0x0E; out[1]=0x04; out[2]=0x0E; return 3;
+    case '9': out[0]=0x06; out[1]=0x0E; out[2]=0x0E; return 3;
+
+    case ' ': out[0]=0x00; return 1;
+    case '!': out[0]=0x0A; return 1;
+    case '.': out[0]=0x08; return 1;
+    case '-': out[0]=0x04; out[1]=0x04; return 2;
+
+    default: return 0; // Fallback
+  }
+}
+
+// -------------------------------------------------------------
+// ГЛАВНЫЙ ДИСПЕТЧЕР ШРИФТОВ С АВТОМАТИЧЕСКИМ FALLBACK
+// -------------------------------------------------------------
+uint8_t getGlyphCols(uint32_t u, uint8_t* out, uint8_t font) {
+  u = normalizeUnicode(u);
+  uint8_t w = 0;
+  switch (font) {
+    case 1: w = getGlyphColsNarrow(u, out); break;
+    case 2: w = getGlyphColsWide(u, out); break;
+    case 3: w = getGlyphColsDigital(u, out); break;
+    case 4: w = getGlyphColsTiny(u, out); break;
+    default: w = getGlyphColsStandard(u, out); break;
+  }
+  if (w == 0) {
+    w = getGlyphColsStandard(u, out);
+  }
+  return w;
 }
 
 void prepareText(String str) {
@@ -282,7 +549,7 @@ void prepareText(String str) {
 
     if (unicode == 0xFE0F || unicode == 0xFE0E) continue; // Пропускаем вариаторы
 
-    uint8_t w = getGlyphCols(unicode, temp);
+    uint8_t w = getGlyphCols(unicode, temp, textFont);
     for (uint8_t j = 0; j < w; j++) {
       textBuffer[textLength++] = temp[j];
     }
@@ -447,9 +714,17 @@ void processBleCommand(String cmd) {
       textBgMode = constrain(tokens[6].toInt(), 0, 3);
       seamlessLoop = (tokens[7].toInt() == 1);
       loopGap = constrain(tokens[8].toInt(), 0, 30);
+      if (tCount >= 10) {
+        textFont = constrain(tokens[9].toInt(), 0, 4);
+      }
+      prepareText(currentText);
       appMode = MODE_TEXT;
       sendBleResponse("OK_TP");
     }
+  } else if (cmd.startsWith("FONT:")) {
+    textFont = constrain(cmd.substring(5).toInt(), 0, 4);
+    prepareText(currentText);
+    sendBleResponse("OK_FONT;" + String(textFont));
   } else if (cmd.startsWith("SETPASS:")) {
     blePassword = cmd.substring(8);
     prefs.putString("ble_pass", blePassword);
@@ -508,7 +783,8 @@ void processBleCommand(String cmd) {
     st += "\"c2\":\"" + colorToHex(color2) + "\",";
     st += "\"c3\":\"" + colorToHex(color3) + "\",";
     st += "\"seamless\":" + String(seamlessLoop ? 1 : 0) + ",";
-    st += "\"gap\":" + String(loopGap) + "}";
+    st += "\"gap\":" + String(loopGap) + ",";
+    st += "\"font\":" + String(textFont) + "}";
     sendBleResponse(st);
   } else if (cmd == "SAVE_TEXT") {
     prefs.putString("text", currentText);
@@ -521,6 +797,7 @@ void processBleCommand(String cmd) {
     prefs.putULong("c3", ((uint32_t)color3.r << 16) | ((uint32_t)color3.g << 8) | color3.b);
     prefs.putBool("seamless", seamlessLoop);
     prefs.putUChar("gap", loopGap);
+    prefs.putUChar("font", textFont);
     sendBleResponse("OK_SAVE_TEXT");
   } else if (cmd == "SAVE_BRIGHT") {
     prefs.putUChar("bright", brightness);
@@ -843,6 +1120,7 @@ void setup() {
   blePassword = prefs.getString("ble_pass", "1234");
   seamlessLoop = prefs.getBool("seamless", true);
   loopGap = prefs.getUChar("gap", 3);
+  textFont = prefs.getUChar("font", 0);
   uint32_t c1Val = prefs.getULong("c1", 0x00FFFF);
   uint32_t c2Val = prefs.getULong("c2", 0xFF0080);
   uint32_t c3Val = prefs.getULong("c3", 0xFFE600);

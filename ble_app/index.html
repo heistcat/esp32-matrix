@@ -280,6 +280,17 @@
     </div>
 
     <div class="card">
+      <div class="card-title">Шрифт текста (Ширина и стиль)</div>
+      <div class="grid-5">
+        <div class="btn-select active" id="tf0" onclick="setTextFont(0)">📐 Стандарт</div>
+        <div class="btn-select" id="tf1" onclick="setTextFont(1)">📏 Узкий 3px</div>
+        <div class="btn-select" id="tf2" onclick="setTextFont(2)">🧱 Широкий Bold</div>
+        <div class="btn-select" id="tf3" onclick="setTextFont(3)">📟 7-Сегмент</div>
+        <div class="btn-select" id="tf4" onclick="setTextFont(4)">🕹️ Ретро 3×3</div>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="card-title">Стиль движения</div>
       <div class="grid-3">
         <div class="btn-select active" id="ts0" onclick="setTextStyle(0)">➡️ Скролл</div>
@@ -762,6 +773,13 @@
       document.getElementById('loopGapSlider').value = loopGap;
       document.getElementById('loopGapVal').innerText = loopGap + ' пикс' + (loopGap == 0 ? ' (встык)' : '');
     }
+    if (data.font !== undefined) {
+      currentFont = data.font;
+      for (let i = 0; i < 5; i++) {
+        const el = document.getElementById('tf' + i);
+        if (el) el.classList.toggle('active', i === currentFont);
+      }
+    }
     showToast("Статус матрицы обновлен");
   }
 
@@ -1082,10 +1100,22 @@
   // --- ТАБ 2: БЕГУЩАЯ СТРОКА BLE ---
   // ==========================================
   let textState = { mode: 0, speed: 65, running: true };
+  let currentFont = 0;
   let currentStyle = 0;
   let currentBg = 0;
   let seamlessLoop = true;
   let loopGap = 3;
+
+  function setTextFont(f) {
+    currentFont = f;
+    for (let i = 0; i < 5; i++) {
+      const el = document.getElementById('tf' + i);
+      if (el) el.classList.toggle('active', i === f);
+    }
+    if (isConnected) {
+      sendBleRaw(`FONT:${currentFont}\n`);
+    }
+  }
 
   function getColorHex(id) {
     const v = document.getElementById(id).value;
@@ -1095,7 +1125,7 @@
   function applyTextBle() {
     let txt = document.getElementById('textInput').value.trim();
     if (!txt) txt = " ";
-    sendBleRaw(`TP:${textState.mode},${getColorHex('tc1')},${getColorHex('tc2')},${getColorHex('tc3')},${textState.speed},${currentStyle},${currentBg},${seamlessLoop ? 1 : 0},${loopGap}\n`);
+    sendBleRaw(`TP:${textState.mode},${getColorHex('tc1')},${getColorHex('tc2')},${getColorHex('tc3')},${textState.speed},${currentStyle},${currentBg},${seamlessLoop ? 1 : 0},${loopGap},${currentFont}\n`);
     sendBleRaw(`T:${txt}\n`);
     showToast("Текст отправлен!");
   }
@@ -1169,7 +1199,7 @@
   }
 
   function sendTextParamsBle() {
-    sendBleRaw(`TP:${textState.mode},${getColorHex('tc1')},${getColorHex('tc2')},${getColorHex('tc3')},${textState.speed},${currentStyle},${currentBg},${seamlessLoop ? 1 : 0},${loopGap}\n`);
+    sendBleRaw(`TP:${textState.mode},${getColorHex('tc1')},${getColorHex('tc2')},${getColorHex('tc3')},${textState.speed},${currentStyle},${currentBg},${seamlessLoop ? 1 : 0},${loopGap},${currentFont}\n`);
   }
 
   function updateTextSpeed(v) {
